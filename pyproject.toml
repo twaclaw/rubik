@@ -1,0 +1,26 @@
+[project]
+name = "rubik"
+version = "0.1.0"
+description = "Playing with a Rubik's Cube"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.3.3",
+    "rich>=14.2.0",
+]
+
+[project.scripts]
+rubik = "rubik.main:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "src"
+]
+testpaths = [
+    "tests"
+]
