@@ -1,4 +1,3 @@
-from collections import deque
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Literal
@@ -179,9 +178,12 @@ class Cube:
             self.faces = np.arange(6, dtype=np.uint8)[:, np.newaxis, np.newaxis]
             self.faces = np.broadcast_to(self.faces, (6, size, size)).copy()
             if initial == "random":
-                for _ in range(15):
+                initial_seq = []
+                for _ in range(10):
                     move = np.random.choice(self.basic_moves)
                     self.move(move)
+                    initial_seq.append(Move(move).name)
+                print(initial_seq)
         elif isinstance(initial, dict):
             pass
 
@@ -242,68 +244,15 @@ class Cube:
 
     def hashable(self) -> bytes:
         # Use bytes directly as key to avoid hash collisions. This is guaranteed to be unique.
-        #return self.faces.copy().tobytes()
-        return hash(self.compress())
+        return self.faces.copy().tobytes()
+
+        # return hash(self.compress())
 
     def is_solution(self) -> bool:
         """Verifies solution independent of rotations."""
         face_uniform = np.all(self.faces == self.faces[:, 0:1, 0:1], axis=(1, 2))
         return np.all(face_uniform)
 
-    def bfs(self):
-        if self.size > 2:
-            raise NotImplementedError(
-                "Are you nuts, BFS, in Python, for a cube larger than 2x2x2?"
-            )
-
-        if self.is_solution():
-            return [], 0
-
-        queue = deque(
-            [(self.compress(), np.array([], dtype=np.uint8))]
-        )  # (compressed_state, move_sequence)
-
-        states_processed = 0
-        visited = {self.hashable()}
-
-        np.random.shuffle(self.possible_moves)
-
-        while queue:
-            states_processed += 1
-
-            current_state, move_seq = queue.popleft()
-
-            if states_processed % 50000 == 0:
-                print(
-                    f"States processed: {states_processed:,}, Seq len: {len(move_seq):,}, Unique states found: {len(visited):,}"
-                )
-
-            self.decompress(
-                current_state
-            )  # Restore the state for this level of the search
-
-            for move_val in self.possible_moves:
-                if len(move_seq) > 1 and (move_val == move_seq[-3:]).all():
-                    continue
-
-                move = Move(move_val)
-                self.move(move)
-
-                if self.is_solution():
-                    solution_path = [
-                        Move(x).name for x in np.append(move_seq, [move.value])
-                    ]
-                    return solution_path, len(visited)
-
-                hash_value = self.hashable()
-                if hash_value not in visited:
-                    visited.add(hash_value)
-                    new_move_seq = np.append(move_seq.copy(), [move.value])
-                    queue.append((self.compress(), new_move_seq))
-
-                self.move(move.inverse())  # Undo the move
-
-        return None, len(visited)
 
     def _color_to_rich(self, face: Face) -> str:
         color_map = {

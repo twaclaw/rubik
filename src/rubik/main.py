@@ -1,4 +1,5 @@
-from .rubik import Cube
+from .bfs import bfs
+from .cube import Cube
 
 
 def main():
@@ -6,7 +7,7 @@ def main():
     c0 = c.faces.copy()
 
     c.plot_cube()
-    solution_path, nodes_visted = c.bfs()
+    solution_path, nodes_visted = bfs(c)
     if solution_path:
         print(f"Solved in {len(solution_path)} moves, visiting {nodes_visted} nodes.")
         print("Solution path:", solution_path)
