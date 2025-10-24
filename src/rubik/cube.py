@@ -166,6 +166,7 @@ class Cube:
         self,
         size: int = 3,
         initial: dict[Face, list[int]] | Literal["random", "solved"] = "random",
+        number_of_scramble_moves: int = 10,
     ):
         self.size = size
         self.rotations = default_rotations | {
@@ -177,13 +178,13 @@ class Cube:
         if initial == "random" or initial == "solved":
             self.faces = np.arange(6, dtype=np.uint8)[:, np.newaxis, np.newaxis]
             self.faces = np.broadcast_to(self.faces, (6, size, size)).copy()
+            self._solved = self.faces.copy()
             if initial == "random":
                 initial_seq = []
-                for _ in range(10):
+                for _ in range(number_of_scramble_moves):
                     move = np.random.choice(self.basic_moves)
                     self.move(move)
                     initial_seq.append(Move(move).name)
-                print(initial_seq)
         elif isinstance(initial, dict):
             pass
 
@@ -252,7 +253,6 @@ class Cube:
         """Verifies solution independent of rotations."""
         face_uniform = np.all(self.faces == self.faces[:, 0:1, 0:1], axis=(1, 2))
         return np.all(face_uniform)
-
 
     def _color_to_rich(self, face: Face) -> str:
         color_map = {

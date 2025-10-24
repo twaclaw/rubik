@@ -21,7 +21,6 @@ def bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
     np.random.shuffle(cube.possible_moves)
 
-    already_visited = 0
 
     while queue:
         states_processed += 1
@@ -29,7 +28,7 @@ def bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
         if states_processed % 50000 == 0:
             print(
-                f"States processed: {states_processed:,}, Seq len: {len(move_seq):,},  queue: {len(queue):,}, visited: {len(visited):,}, already_visited: {already_visited:,}"
+                f"States processed: {states_processed:,}, Seq len: {len(move_seq):,},  queue: {len(queue):,}, visited: {len(visited):,}"
             )
 
         cube.decompress(current_state)  # updates cube.faces
@@ -49,8 +48,6 @@ def bfs(cube: Cube) -> tuple[list[str] | None, int]:
                 visited.add(hash_value)
                 new_move_seq = np.append(move_seq.copy(), [move.value])
                 queue.append((cube.compress(), new_move_seq))
-            else:
-                already_visited += 1
 
             cube.move(move.inverse())  # Undo the move
 
