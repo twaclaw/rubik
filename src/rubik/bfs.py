@@ -16,19 +16,19 @@ def bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
     queue = deque([(cube.compress(), np.array([], dtype=np.uint8))])  # (compressed_state, move_sequence)
 
-    states_processed = 0
+    i = 0
     visited = {cube.hashable()}
 
     np.random.shuffle(cube.possible_moves)
 
 
     while queue:
-        states_processed += 1
+        i += 1
         current_state, move_seq = queue.popleft()
 
-        if states_processed % 50000 == 0:
+        if i % 50000 == 0:
             print(
-                f"States processed: {states_processed:,}, Seq len: {len(move_seq):,},  queue: {len(queue):,}, visited: {len(visited):,}"
+                f"States processed: {i:,}, Seq len: {len(move_seq):,},  queue: {len(queue):,}, visited: {len(visited):,}"
             )
 
         cube.decompress(current_state)  # updates cube.faces
@@ -37,16 +37,13 @@ def bfs(cube: Cube) -> tuple[list[str] | None, int]:
             move = Move(move_val)
             cube.move(move)
 
+            new_move_seq = np.append(move_seq.copy(), [move.value])
             if cube.is_solution():
-                solution_path = [
-                    Move(x).name for x in np.append(move_seq, [move.value])
-                ]
-                return solution_path, len(visited)
+                return [Move(x).name for x in new_move_seq], i
 
             hash_value = cube.hashable()
             if hash_value not in visited:
                 visited.add(hash_value)
-                new_move_seq = np.append(move_seq.copy(), [move.value])
                 queue.append((cube.compress(), new_move_seq))
 
             cube.move(move.inverse())  # Undo the move

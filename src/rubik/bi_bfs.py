@@ -5,14 +5,6 @@ import numpy as np
 from .cube import Cube, Move
 
 
-def reverse_sequence(sequence: np.ndarray) -> np.ndarray:
-    return np.array([Move(x).inverse().value for x in sequence[::-1]])
-
-
-def solution_path(sequence: np.ndarray) -> list[str]:
-    return [Move(x).name for x in sequence]
-
-
 def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
     """
     Bidirectional BFS. Meet in the middle.
@@ -30,9 +22,7 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
     solved_cube = Cube(size=cube.size, initial="solved")
 
-    queue_front = deque(
-        [(cube.compress(), np.array([], dtype=np.uint8))]
-    )  # (compressed_state, seq_frontuence)
+    queue_front = deque([(cube.compress(), np.array([], dtype=np.uint8))])
     queue_back = deque([(solved_cube.compress(), np.array([], dtype=np.uint8))])
 
     states_processed = 0
@@ -55,15 +45,19 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
             cube.move(move)
 
             if cube.is_solution():
-                return solution_path(np.append(seq_front, [move])), len(visited_front)
+                return cube.solution_path(np.append(seq_front, [move])), len(
+                    visited_front
+                )
 
             hash_value = cube.hashable()
 
             new_seq = np.append(seq_front.copy(), [move.value])
 
             if hash_value in visited_back:
-                seq_back_sol = reverse_sequence(visited_back[hash_value])
-                return solution_path(np.append(new_seq, seq_back_sol)), len(visited_front) + len(visited_back)
+                seq_back_sol = cube.reverse_sequence(visited_back[hash_value])
+                return cube.solution_path(np.append(new_seq, seq_back_sol)), len(
+                    visited_front
+                ) + len(visited_back)
 
             if hash_value not in visited_front:
                 visited_front[hash_value] = new_seq
@@ -82,7 +76,9 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
             if hash_value in visited_front:
                 seq_front_sol = visited_front[hash_value]
-                return solution_path(np.append(seq_front_sol, reverse_sequence(new_seq))), len(visited_front) + len(visited_back)
+                return cube.solution_path(
+                    np.append(seq_front_sol, cube.reverse_sequence(new_seq))
+                ), len(visited_front) + len(visited_back)
 
             if hash_value not in visited_back:
                 visited_back[hash_value] = new_seq

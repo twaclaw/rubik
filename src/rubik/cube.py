@@ -31,6 +31,8 @@ class SliceType(IntEnum):
     BOTTOM_ROW = 1
     LEFT_COL = 2
     RIGHT_COL = 3
+    MIDDLE_ROW = 4
+    MIDDLE_COL = 5
 
 
 @dataclass
@@ -83,20 +85,27 @@ class Move(IntEnum):
     R = 3
     U = 4
     D = 5
-    f = 6
-    b = 7
-    l = 8
-    r = 9
-    u = 10
-    d = 11
+    E = 6  # Equatorial slice, in the D direction
+    M = 7  # Middle slice, in the L direction
+    S = 8  # Standing slice, in the F direction
+    f = 9
+    b = 10
+    l = 11
+    r = 12
+    u = 13
+    d = 14
+    e = 15
+    m = 16
+    s = 17
 
     def inverse(self) -> "Move":
-        if self.value < 6:
-            return Move(self.value + 6)
+        if self.value < 9:
+            return Move(self.value + 9)
         else:
-            return Move(self.value - 6)
+            return Move(self.value - 9)
 
 
+# Apply to cubes of any size
 default_rotations: dict[Move, Rotation] = {
     Move.F: Rotation(
         face=Face.F,
@@ -160,6 +169,40 @@ default_rotations: dict[Move, Rotation] = {
     ),
 }
 
+cube_3_additional_rotations: dict[Move, Rotation] = {
+    Move.E: Rotation(
+        face=None,
+        rotation=RotationType.CLOCKWISE,
+        cycle=[
+            CycleElement(Face.F, SliceType.MIDDLE_ROW, False, False),
+            CycleElement(Face.R, SliceType.MIDDLE_ROW, False, False),
+            CycleElement(Face.B, SliceType.MIDDLE_ROW, False, False),
+            CycleElement(Face.L, SliceType.MIDDLE_ROW, False, False),
+        ],
+    ),
+    Move.M: Rotation(
+        face=None,
+        rotation=RotationType.CLOCKWISE,
+        cycle=[
+            CycleElement(Face.F, SliceType.MIDDLE_COL, False, False),
+            CycleElement(Face.U, SliceType.MIDDLE_COL, True, False),
+            CycleElement(Face.B, SliceType.MIDDLE_COL, True, True),
+            CycleElement(Face.D, SliceType.MIDDLE_COL, False, True),
+        ],
+    ),
+    Move.S: Rotation(
+        face=None,
+        rotation=RotationType.CLOCKWISE,
+        cycle=[
+            CycleElement(Face.L, SliceType.MIDDLE_ROW, True, False),
+            CycleElement(Face.U, SliceType.MIDDLE_ROW, False, True),
+            CycleElement(Face.R, SliceType.MIDDLE_ROW, True, False),
+            CycleElement(Face.D, SliceType.MIDDLE_ROW, False, True),
+        ]
+    ),
+    # To be implemented if needed
+}
+
 
 class Cube:
     def __init__(
@@ -169,8 +212,11 @@ class Cube:
         number_of_scramble_moves: int = 10,
     ):
         self.size = size
-        self.rotations = default_rotations | {
-            k.inverse(): v.inverse() for k, v in default_rotations.items()
+        self.rotations = default_rotations
+        if size == 3:
+            self.rotations |= cube_3_additional_rotations
+        self.rotations |= {
+            k.inverse(): v.inverse() for k, v in self.rotations.items()
         }
         self.possible_moves = np.array(list(self.rotations.keys()))
         self.basic_moves = np.array(list(default_rotations.keys()))
@@ -197,6 +243,12 @@ class Cube:
             return (slice(None), 0)
         elif slice_type == SliceType.RIGHT_COL:
             return (slice(None), self.size - 1)
+        elif slice_type == SliceType.MIDDLE_ROW:
+            mid = self.size // 2
+            return (mid, slice(None))
+        elif slice_type == SliceType.MIDDLE_COL:
+            mid = self.size // 2
+            return (slice(None), mid)
         else:
             raise ValueError(f"Unknown slice type: {slice_type}")
 
@@ -219,9 +271,10 @@ class Cube:
     def move(self, move: Move):
         rotation = self.rotations[move]
         # Rotate the face itself
-        self.faces[rotation.face] = np.rot90(
-            self.faces[rotation.face], k=rotation.rotation.value
-        )
+        if rotation.face is not None:
+            self.faces[rotation.face] = np.rot90(
+                self.faces[rotation.face], k=rotation.rotation.value
+            )
 
         # Rotate the adjacent faces
         sources = []
@@ -253,6 +306,14 @@ class Cube:
         """Verifies solution independent of rotations."""
         face_uniform = np.all(self.faces == self.faces[:, 0:1, 0:1], axis=(1, 2))
         return np.all(face_uniform)
+
+    @staticmethod
+    def reverse_sequence(sequence: np.ndarray) -> np.ndarray:
+        return np.array([Move(x).inverse().value for x in sequence[::-1]])
+
+    @staticmethod
+    def solution_path(sequence: np.ndarray) -> list[str]:
+        return [Move(x).name for x in sequence]
 
     def _color_to_rich(self, face: Face) -> str:
         color_map = {
