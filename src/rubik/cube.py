@@ -11,11 +11,11 @@ from rich.text import Text
 
 class Face(IntEnum):
     U = 0  # Up
-    D = 1  # Down
+    R = 1  # Right
     F = 2  # Front
-    B = 3  # Back
+    D = 3  # Down
     L = 4  # Left
-    R = 5  # Right
+    B = 5  # Back
 
 
 class RotationType(IntEnum):
@@ -208,7 +208,7 @@ class Cube:
     def __init__(
         self,
         size: int = 3,
-        initial: dict[Face, list[int]] | Literal["random", "solved"] = "random",
+        initial: np.ndarray | Literal["random", "solved"] = "random",
         number_of_scramble_moves: int = 10,
     ):
         self.size = size
@@ -221,7 +221,9 @@ class Cube:
         self.possible_moves = np.array(list(self.rotations.keys()))
         self.basic_moves = np.array(list(default_rotations.keys()))
 
-        if initial == "random" or initial == "solved":
+        if isinstance(initial, np.ndarray):
+            self.faces = initial.copy()
+        elif isinstance(initial, str) and (initial == "random" or initial == "solved"):
             self.faces = np.arange(6, dtype=np.uint8)[:, np.newaxis, np.newaxis]
             self.faces = np.broadcast_to(self.faces, (6, size, size)).copy()
             self._solved = self.faces.copy()
@@ -231,8 +233,6 @@ class Cube:
                     move = np.random.choice(self.basic_moves)
                     self.move(move)
                     initial_seq.append(Move(move).name)
-        elif isinstance(initial, dict):
-            pass
 
     def _get_slice(self, slice_type: SliceType):
         if slice_type == SliceType.TOP_ROW:
@@ -353,6 +353,33 @@ class Cube:
 
         return table
 
+    def plot_face_with_labels(self, face_index: int, print_table: bool = False) -> Table:
+        table = Table(show_header=False, show_edge=True, expand=False, padding=(0, 0))
+
+        for _ in range(self.size):
+            table.add_column(justify="center", width=4)
+
+        for row in range(self.size):
+            row_data = []
+            for col in range(self.size):
+                face_letter = Face(face_index).name
+                position_number = row * self.size + col + 1
+                face_value = self.faces[face_index, row, col]
+                rich_color = self._color_to_rich(Face(face_value))
+                label_text = f"[bold {rich_color}]{face_letter}{position_number}[/]"
+                row_data.append(label_text)
+
+            table.add_row(*row_data)
+
+            if row < self.size - 1:
+                table.add_section()
+
+        if print_table:
+            console = Console()
+            console.print(table)
+
+        return table
+
     def _plot_invisible_face(self) -> Text:
         total_lines = self.size * 2 + (self.size - 1)
         line_width = 5 * self.size + 1  # Approximate width including borders/spacing
@@ -362,19 +389,30 @@ class Cube:
 
         return Text("\n".join(invisible_lines), style="")
 
-    def plot_cube(self):
+    def _plot_invisible_face_with_labels(self) -> Table:
+        table = Table(show_header=False, show_edge=True, show_lines=True, expand=False, padding=(0, 0), style="black")
+
+        for _ in range(self.size):
+            table.add_column(justify="center", width=4)
+
+        return table
+
+    def plot_cube(self, plot_with_labels: bool = False):
         """Plot the entire cube with all faces."""
         console = Console()
 
+        face_plotter = (
+            self.plot_face_with_labels if plot_with_labels else self.plot_face
+        )
         # Create tables for each face
-        up_table = self.plot_face(Face.U)
-        down_table = self.plot_face(Face.D)
-        front_table = self.plot_face(Face.F)
-        back_table = self.plot_face(Face.B)
-        left_table = self.plot_face(Face.L)
-        right_table = self.plot_face(Face.R)
+        up_table = face_plotter(Face.U)
+        down_table = face_plotter(Face.D)
+        front_table = face_plotter(Face.F)
+        back_table = face_plotter(Face.B)
+        left_table = face_plotter(Face.L)
+        right_table = face_plotter(Face.R)
 
-        invisible = self._plot_invisible_face()
+        invisible = self._plot_invisible_face_with_labels() if plot_with_labels else self._plot_invisible_face()
 
         top_row = Columns(
             [invisible, up_table], equal=True, expand=False, padding=(0, 0)
