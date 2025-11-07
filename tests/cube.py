@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from rubik.cube import Cube, Move
+from rubik.cubie_cube import BasicMoves, Color, CubieCube
 
 
 class TestCube:
@@ -108,3 +109,61 @@ class TestCube:
                 cube.move(move)
                 cube.move(move.inverse())
                 assert (cube.faces == c0).all()
+
+
+class TestCubie:
+    @pytest.mark.parametrize(
+        "test_cases",
+        [
+            [(400, [Color.F])],
+            [(400, [Color.B])],
+            [(400, [Color.U])],
+            [(400, [Color.D])],
+            [(400, [Color.R])],
+            [(400, [Color.L])],
+            [(6, [Color.F, Color.F, Color.R, Color.R])],
+            [(6, [Color.B, Color.B, Color.L, Color.L])],
+            [(6, [Color.L, Color.L, Color.F, Color.F])],
+        ],
+    )
+    def test_identity_cycles(self, test_cases):
+        cubie = CubieCube()
+        cube = cubie.to_cube()
+        original_state = cube.faces.copy()
+
+        for repetitions, moves in test_cases:
+            for _ in range(repetitions):
+                for move in moves:
+                    cubie.multiply(BasicMoves[move])
+
+        cube = cubie.to_cube()
+        assert (cube.faces == original_state).all(), (
+            "Cube state does not match original solved state"
+        )
+
+    @pytest.mark.parametrize(
+        "sequence",
+        [
+            [Color.F],
+            [Color.B],
+            [Color.U],
+            [Color.D],
+            [Color.R],
+            [Color.L],
+            [Color.F, Color.F, Color.R, Color.R],
+            [Color.B, Color.B, Color.L, Color.L],
+            [Color.L, Color.L, Color.F, Color.F],
+        ]
+    )
+    def test_inverses(self, sequence):
+        cubie = CubieCube()
+        cubie_original = cubie.copy()
+        moves = [BasicMoves[move] for move in sequence]
+        moves_inverse = [move.inverse() for move in reversed(moves)]
+        for move in moves:
+            cubie.multiply(move)
+
+        for move in moves_inverse:
+            cubie.multiply(move)
+
+        assert cubie == cubie_original
