@@ -84,7 +84,8 @@ class CubieCube:
          - 1 -> rotated clockwise (for corners) or flipped (for edges)
          - 2 -> rotated counter-clockwise (for corners) or flipped (for edges)
         """
-
+        self.num_corners = 8
+        self.num_edges = 12
         if corners is None:
             self.corners = np.array([[Corner(i), 0] for i in range(8)], dtype=int)
         else:
@@ -115,7 +116,6 @@ class CubieCube:
             [(3, 0, 2), (1, 2, 2), (5, 2, 2)],  # Corner DRB: D-R-B
         ]
 
-        # Edge facelet positions for each edge in solved state
         # Each edge has 2 facelets
         edge_facelets = [
             [(0, 1, 2), (1, 0, 1)],  # Edge UR: U-R
@@ -136,38 +136,29 @@ class CubieCube:
         for face in range(6):
             faces[face, 1, 1] = face
 
-        # Place corners with orientation
-        for i in range(8):
-            corner_pos = self.corners[i, 0]  # Which corner position
-            orientation = self.corners[i, 1]  # Orientation
+        for i in range(self.num_corners):
+            corner_pos = self.corners[i, 0]
+            orientation = self.corners[i, 1]
 
-            # Get the 3 facelets for this corner position
             facelets = corner_facelets[corner_pos]
 
-            # Apply orientation by rotating the facelet colors
-            # Orientation 0: no change, 1: rotate clockwise, 2: rotate counter-clockwise
             colors = [facelets[j][0] for j in range(3)]  # Original face colors
             rotated_colors = colors[orientation:] + colors[:orientation]
 
-            # Assign colors to facelets
             for j in range(3):
                 face, row, col = facelets[j]
                 faces[face, row, col] = rotated_colors[j]
 
-        # Place edges with orientation
-        for i in range(12):
-            edge_pos = self.edges[i, 0]  # Which edge position
-            orientation = self.edges[i, 1]  # Orientation
+        for i in range(self.num_edges):
+            edge_pos = self.edges[i, 0]
+            orientation = self.edges[i, 1]
 
-            # Get the 2 facelets for this edge position
             facelets = edge_facelets[edge_pos]
 
-            # Apply orientation (flip if orientation == 1)
-            colors = [facelets[j][0] for j in range(2)]  # Original face colors
+            colors = [facelets[j][0] for j in range(2)]
             if orientation == 1:
-                colors = colors[::-1]  # Flip colors
+                colors = colors[::-1]
 
-            # Assign colors to facelets
             for j in range(2):
                 face, row, col = facelets[j]
                 faces[face, row, col] = colors[j]
@@ -248,23 +239,45 @@ class CubieCube:
 
     def inverse(self) -> "CubieCube":
         inv = CubieCube()
-        inv.edges[self.edges[:, 0], 0] = np.arange(12, dtype=int)
+        inv.edges[self.edges[:, 0], 0] = np.arange(self.num_edges, dtype=int)
         inv.edges[:, 1] = self.edges[:, 1][inv.edges[:, 0]]
 
-        inv.corners[self.corners[:, 0], 0] = np.arange(8, dtype=int)
+        inv.corners[self.corners[:, 0], 0] = np.arange(self.num_corners, dtype=int)
 
         ori = self.corners[:, 1][inv.corners[:, 0]]
         mask = ori >= 3
         inv.corners[:, 1] = np.where(mask, ori, -ori)
-        inv.corners[:, 1] = np.where(inv.corners[:, 1] < 0, inv.corners[:, 1] + 3, inv.corners[:, 1])
+        inv.corners[:, 1] = np.where(
+            inv.corners[:, 1] < 0, inv.corners[:, 1] + 3, inv.corners[:, 1]
+        )
 
         return inv
 
-    # Functions defining coordinates for phases 1 and 2
+    # Functions defining coordinates for two-phase algorithm
 
     def get_twist(self) -> int:
         """Compute the twist coordinate (corner orientations) of this CubieCube."""
-        return np.polyval(self.corners[:, 1], 3)
+        return np.polyval(self.corners[:-1, 1], 3).astype(int)
+
+    def set_twist(self, twist: int) -> None:
+        """Set the corner orientations of this CubieCube from the given twist coordinate."""
+        powers = 3 ** np.arange(self.num_corners - 1)
+        div = twist // powers
+        twistparity = np.sum(self.corners[:-1, 1]) % 3
+        self.corners[:, 1] = np.concat(
+            [np.flip(np.mod(div, 3)), [(3 - twistparity) % 3]]
+        )
+
+    def get_flip(self) -> int:
+        """Compute the flip coordinate (edge orientations) of this CubieCube."""
+        return np.polyval(self.edges[:-1, 1], 2).astype(int)
+
+    def set_flip(self, flip: int) -> None:
+        """Set the edge orientations of this CubieCube from the given flip coordinate."""
+        powers = 2 ** np.arange(self.num_edges - 1)
+        div = flip // powers
+        flipparity = np.sum(self.edges[:, 1]) % 2
+        self.edges[:, 1] = np.concat([np.flip(np.mod(div, 2)), [(2 - flipparity) % 2]])
 
 
 # ------

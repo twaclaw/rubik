@@ -167,3 +167,15 @@ class TestCubie:
             cubie.multiply(move)
 
         assert cubie == cubie_original
+
+    def test_flips(self):
+        cube = CubieCube()
+        for i in range(2**11):
+            cube.set_flip(i)
+            assert i == cube.get_flip()
+
+    def test_twists(self):
+        cube = CubieCube()
+        for i in range(3**7):
+            cube.set_twist(i)
+            assert i == cube.get_twist()
