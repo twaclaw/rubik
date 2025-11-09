@@ -25,6 +25,7 @@ https://github.com/hkociemba/RubiksCube-TwophaseSolver.git
                 └────┴────┴────┘
 """
 
+import math
 from enum import IntEnum
 
 import numpy as np
@@ -86,6 +87,14 @@ class CubieCube:
         """
         self.num_corners = 8
         self.num_edges = 12
+        self._comb_vectorized = np.vectorize(
+            self.c_nk
+        )  # TODO: consider using scipy.special.comb
+
+        # used for slice coordinate calculations
+        self._slice_edge = np.array([Edge.FR, Edge.FL, Edge.BL, Edge.BR])
+        self._other_edge = np.array([Edge.UR, Edge.UF, Edge.UL, Edge.UB, Edge.DR, Edge.DF, Edge.DL, Edge.DB])
+
         if corners is None:
             self.corners = np.array([[Corner(i), 0] for i in range(8)], dtype=int)
         else:
@@ -95,6 +104,159 @@ class CubieCube:
             self.edges = np.array([[Edge(i), 0] for i in range(12)], dtype=int)
         else:
             self.edges = edges
+
+    @staticmethod
+    def rotate_right(a: np.ndarray, left: int, right: int):
+        """In-place rotate right of a[left:right]"""
+        a[left : right + 1] = np.roll(a[left : right + 1], 1)
+
+    @staticmethod
+    def rotate_left(a: np.ndarray, left: int, right: int):
+        """In-place rotate left of a[left:right]"""
+        a[left : right + 1] = np.roll(a[left : right + 1], -1)
+
+    @staticmethod
+    def c_nk(n: int, k: int) -> int:
+        """Compute the binomial coefficient C(n, k)"""
+        return math.comb(n, k)
+
+    def __eq__(self, other: object) -> bool:
+        return np.array_equal(self.corners, other.corners) and np.array_equal(
+            self.edges, other.edges
+        )
+
+    def copy(self) -> "CubieCube":
+        """Create a copy of this CubieCube."""
+        return CubieCube(corners=self.corners.copy(), edges=self.edges.copy())
+
+    def corner_multiply(self, other: "CubieCube") -> None:
+        """Multiply this cubie cube with another cubie cube, restricted to the corners."""
+        # Extract permutations and orientations
+        cp_a = self.corners[:, 0]  # corner permutation
+        co_a = self.corners[:, 1]  # corner orientation
+        cp_b = other.corners[:, 0]
+        ori_b = other.corners[:, 1]
+
+        c_perm = cp_a[cp_b]
+        ori_a = co_a[cp_b]
+
+        # Initialize result orientation array
+        c_ori = np.zeros(8, dtype=np.uint8)
+
+        # Case 1: both regular cubes (ori_a < 3 and ori_b < 3)
+        ori = ori_a + ori_b
+        mask1 = (ori_a < 3) & (ori_b < 3)
+        ori = np.where(ori >= 3, ori - 3, ori)
+        c_ori = np.where(mask1, ori, c_ori)
+
+        # Case 2: cube b is in a mirrored state (ori_a < 3 and ori_b >= 3)
+        mask2 = (ori_a < 3) & (ori_b >= 3)
+        ori = ori_a + ori_b
+        ori = np.where(ori >= 6, ori - 3, ori)
+        c_ori = np.where(mask2, ori, c_ori)
+
+        # Case 3: cube a is in a mirrored state (ori_a >= 3 and ori_b < 3)
+        mask3 = (ori_a >= 3) & (ori_b < 3)
+        ori = ori_a - ori_b
+        ori = np.where(ori < 3, ori + 3, ori)
+        c_ori = np.where(mask3, ori, c_ori)
+
+        # Case 4: both cubes are in mirrored states (ori_a >= 3 and ori_b >= 3)
+        mask4 = (ori_a >= 3) & (ori_b >= 3)
+        ori = ori_a - ori_b
+        ori = np.where(ori < 0, ori + 3, ori)
+        c_ori = np.where(mask4, ori, c_ori)
+
+        # Update self.corners
+        self.corners[:, 0] = c_perm
+        self.corners[:, 1] = c_ori
+
+    def edge_multiply(self, other: "CubieCube") -> None:
+        """Multiply this cubie cube with another cubie cube b, restricted to the edges. Does not change b."""
+        ep_a = self.edges[:, 0]  # permuatation
+        eo_a = self.edges[:, 1]  # orientation
+        ep_b = other.edges[:, 0]
+        eo_b = other.edges[:, 1]
+
+        e_perm = ep_a[ep_b]
+
+        # new orientation
+        e_ori = np.mod((eo_b + eo_a[ep_b]), 2)
+
+        self.edges[:, 0] = e_perm
+        self.edges[:, 1] = e_ori
+
+    def multiply(self, other: "CubieCube") -> None:
+        """Multiply this cubie cube with another cubie cube b. Does not change b."""
+        self.corner_multiply(other)
+        self.edge_multiply(other)
+
+    def inverse(self) -> "CubieCube":
+        inv = CubieCube()
+        inv.edges[self.edges[:, 0], 0] = np.arange(self.num_edges, dtype=int)
+        inv.edges[:, 1] = self.edges[:, 1][inv.edges[:, 0]]
+
+        inv.corners[self.corners[:, 0], 0] = np.arange(self.num_corners, dtype=int)
+
+        ori = self.corners[:, 1][inv.corners[:, 0]]
+        mask = ori >= 3
+        inv.corners[:, 1] = np.where(mask, ori, -ori)
+        inv.corners[:, 1] = np.where(
+            inv.corners[:, 1] < 0, inv.corners[:, 1] + 3, inv.corners[:, 1]
+        )
+
+        return inv
+
+    # Functions defining coordinates for two-phase algorithm
+
+    def get_twist(self) -> int:
+        """Compute the twist coordinate (corner orientations) of this CubieCube."""
+        return np.polyval(self.corners[:-1, 1], 3).astype(int)
+
+    def set_twist(self, twist: int) -> None:
+        """Set the corner orientations of this CubieCube from the given twist coordinate."""
+        powers = 3 ** np.arange(self.num_corners - 1)
+        div = twist // powers
+        twistparity = np.sum(self.corners[:-1, 1]) % 3
+        self.corners[:, 1] = np.concat(
+            [np.flip(np.mod(div, 3)), [(3 - twistparity) % 3]]
+        )
+
+    def get_flip(self) -> int:
+        """Compute the flip coordinate (edge orientations) of this CubieCube."""
+        return np.polyval(self.edges[:-1, 1], 2).astype(int)
+
+    def set_flip(self, flip: int) -> None:
+        """Set the edge orientations of this CubieCube from the given flip coordinate."""
+        powers = 2 ** np.arange(self.num_edges - 1)
+        div = flip // powers
+        flipparity = np.sum(self.edges[:, 1]) % 2
+        self.edges[:, 1] = np.concat([np.flip(np.mod(div, 2)), [(2 - flipparity) % 2]])
+
+    def get_slice(self) -> int:
+        """Get the location of the UD-slice edges FR,FL,BL and BR ignoring their permutation.
+        0<= slice < 495 in phase 1, slice = 0 in phase 2."""
+        mask = (self.edges[:, 0] >= Edge.FR) & (self.edges[:, 0] <= Edge.BR)
+        j = np.where(mask)[0][::-1] # flipped order
+        x = np.arange(len(j))
+        return np.sum(self._comb_vectorized(11 - j, x + 1))
+
+    def set_slice(self, idx: int):
+        ep = np.full(12, -1, dtype=np.int8) # invalidate all edge positions
+        x = 4
+        #TODO: check if this can be optimized
+        for j in np.arange(self.num_edges):
+            comb = self.c_nk(11 - j, x)
+            if idx - comb >= 0:
+                ep[j] = self._slice_edge[4 - x]
+                idx -= comb
+                x -= 1
+
+        mask = (ep == -1)
+        ep[mask] = self._other_edge[:np.sum(mask)]
+        self.edges[:, 0] = ep
+
+    # --- End of coordinate functions ---
 
     def to_cube(self) -> Cube:
         """Convert this CubieCube representation to a Facelet Cube representation."""
@@ -165,119 +327,6 @@ class CubieCube:
 
         cube = Cube(initial=faces, size=3)
         return cube
-
-    def corner_multiply(self, other: "CubieCube") -> None:
-        """Multiply this cubie cube with another cubie cube, restricted to the corners."""
-        # Extract permutations and orientations
-        cp_a = self.corners[:, 0]  # corner permutation
-        co_a = self.corners[:, 1]  # corner orientation
-        cp_b = other.corners[:, 0]
-        ori_b = other.corners[:, 1]
-
-        c_perm = cp_a[cp_b]
-        ori_a = co_a[cp_b]
-
-        # Initialize result orientation array
-        c_ori = np.zeros(8, dtype=np.uint8)
-
-        # Case 1: both regular cubes (ori_a < 3 and ori_b < 3)
-        ori = ori_a + ori_b
-        mask1 = (ori_a < 3) & (ori_b < 3)
-        ori = np.where(ori >= 3, ori - 3, ori)
-        c_ori = np.where(mask1, ori, c_ori)
-
-        # Case 2: cube b is in a mirrored state (ori_a < 3 and ori_b >= 3)
-        mask2 = (ori_a < 3) & (ori_b >= 3)
-        ori = ori_a + ori_b
-        ori = np.where(ori >= 6, ori - 3, ori)
-        c_ori = np.where(mask2, ori, c_ori)
-
-        # Case 3: cube a is in a mirrored state (ori_a >= 3 and ori_b < 3)
-        mask3 = (ori_a >= 3) & (ori_b < 3)
-        ori = ori_a - ori_b
-        ori = np.where(ori < 3, ori + 3, ori)
-        c_ori = np.where(mask3, ori, c_ori)
-
-        # Case 4: both cubes are in mirrored states (ori_a >= 3 and ori_b >= 3)
-        mask4 = (ori_a >= 3) & (ori_b >= 3)
-        ori = ori_a - ori_b
-        ori = np.where(ori < 0, ori + 3, ori)
-        c_ori = np.where(mask4, ori, c_ori)
-
-        # Update self.corners
-        self.corners[:, 0] = c_perm
-        self.corners[:, 1] = c_ori
-
-    def edge_multiply(self, other: "CubieCube") -> None:
-        """Multiply this cubie cube with another cubie cube b, restricted to the edges. Does not change b."""
-        ep_a = self.edges[:, 0]  # permuatation
-        eo_a = self.edges[:, 1]  # orientation
-        ep_b = other.edges[:, 0]
-        eo_b = other.edges[:, 1]
-
-        e_perm = ep_a[ep_b]
-
-        # new orientation
-        e_ori = np.mod((eo_b + eo_a[ep_b]), 2)
-
-        self.edges[:, 0] = e_perm
-        self.edges[:, 1] = e_ori
-
-    def multiply(self, other: "CubieCube") -> None:
-        """Multiply this cubie cube with another cubie cube b. Does not change b."""
-        self.corner_multiply(other)
-        self.edge_multiply(other)
-
-    def __eq__(self, other: object) -> bool:
-        return np.array_equal(self.corners, other.corners) and np.array_equal(
-            self.edges, other.edges
-        )
-
-    def copy(self) -> "CubieCube":
-        """Create a copy of this CubieCube."""
-        return CubieCube(corners=self.corners.copy(), edges=self.edges.copy())
-
-    def inverse(self) -> "CubieCube":
-        inv = CubieCube()
-        inv.edges[self.edges[:, 0], 0] = np.arange(self.num_edges, dtype=int)
-        inv.edges[:, 1] = self.edges[:, 1][inv.edges[:, 0]]
-
-        inv.corners[self.corners[:, 0], 0] = np.arange(self.num_corners, dtype=int)
-
-        ori = self.corners[:, 1][inv.corners[:, 0]]
-        mask = ori >= 3
-        inv.corners[:, 1] = np.where(mask, ori, -ori)
-        inv.corners[:, 1] = np.where(
-            inv.corners[:, 1] < 0, inv.corners[:, 1] + 3, inv.corners[:, 1]
-        )
-
-        return inv
-
-    # Functions defining coordinates for two-phase algorithm
-
-    def get_twist(self) -> int:
-        """Compute the twist coordinate (corner orientations) of this CubieCube."""
-        return np.polyval(self.corners[:-1, 1], 3).astype(int)
-
-    def set_twist(self, twist: int) -> None:
-        """Set the corner orientations of this CubieCube from the given twist coordinate."""
-        powers = 3 ** np.arange(self.num_corners - 1)
-        div = twist // powers
-        twistparity = np.sum(self.corners[:-1, 1]) % 3
-        self.corners[:, 1] = np.concat(
-            [np.flip(np.mod(div, 3)), [(3 - twistparity) % 3]]
-        )
-
-    def get_flip(self) -> int:
-        """Compute the flip coordinate (edge orientations) of this CubieCube."""
-        return np.polyval(self.edges[:-1, 1], 2).astype(int)
-
-    def set_flip(self, flip: int) -> None:
-        """Set the edge orientations of this CubieCube from the given flip coordinate."""
-        powers = 2 ** np.arange(self.num_edges - 1)
-        div = flip // powers
-        flipparity = np.sum(self.edges[:, 1]) % 2
-        self.edges[:, 1] = np.concat([np.flip(np.mod(div, 2)), [(2 - flipparity) % 2]])
 
 
 # ------

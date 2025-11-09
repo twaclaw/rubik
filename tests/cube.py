@@ -1,4 +1,3 @@
-
 import numpy as np
 import pytest
 
@@ -84,17 +83,7 @@ class TestCube:
 
     @pytest.mark.parametrize(
         "move",
-        [
-            Move.F,
-            Move.U,
-            Move.B,
-            Move.D,
-            Move.R,
-            Move.L,
-            Move.E,
-            Move.M,
-            Move.S
-        ],
+        [Move.F, Move.U, Move.B, Move.D, Move.R, Move.L, Move.E, Move.M, Move.S],
     )
     def test_inverses(self, move):
         for size in [2, 3, 4, 5]:
@@ -153,7 +142,7 @@ class TestCubie:
             [Color.F, Color.F, Color.R, Color.R],
             [Color.B, Color.B, Color.L, Color.L],
             [Color.L, Color.L, Color.F, Color.F],
-        ]
+        ],
     )
     def test_inverses(self, sequence):
         cubie = CubieCube()
@@ -179,3 +168,21 @@ class TestCubie:
         for i in range(3**7):
             cube.set_twist(i)
             assert i == cube.get_twist()
+
+    def test_slices(self):
+        cube = CubieCube()
+        for i in range(495):
+            cube.set_slice(i)
+            assert i == cube.get_slice()
+
+    def test_aux_functions(self):
+        cube = CubieCube()
+        N = 20
+        a = np.random.randint(0, N, N)
+        a0 = a.copy()
+
+        for right in range(N):
+            for left in range(right, N):
+                cube.rotate_right(a, right, left)
+                cube.rotate_left(a, right, left)
+                assert np.array_equal(a0, a)
