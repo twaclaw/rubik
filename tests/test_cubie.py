@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from rubik.cube import Cube, Move
+from rubik.cube import Cube
 from rubik.cubie_cube import BasicMoves, Color, CubieCube
 
 
@@ -110,3 +110,10 @@ class TestCubie:
                 cube.rotate_right(a, right, left)
                 cube.rotate_left(a, right, left)
                 assert np.array_equal(a0, a)
+
+    def test_set_get_corners(self):
+        cube = CubieCube()
+        for i in range(40320):
+            cube.set_corners(i)
+            c = cube.get_corners()
+            assert i == c

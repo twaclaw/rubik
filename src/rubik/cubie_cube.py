@@ -29,6 +29,7 @@ import math
 from enum import IntEnum
 
 import numpy as np
+from lehmer import Lehmer
 
 from .cube import Cube
 
@@ -104,6 +105,8 @@ class CubieCube:
             self.edges = np.array([[Edge(i), 0] for i in range(12)], dtype=int)
         else:
             self.edges = edges
+
+        self.lc8 = Lehmer(n=8, squeeze=True) # Lehmer code class for corners
 
     @staticmethod
     def rotate_right(a: np.ndarray, left: int, right: int, k: int = 1):
@@ -414,21 +417,10 @@ class CubieCube:
         """Get the permutation of the 8 corners.
         0 <= corners < 40320 defined but unused in phase 1, 0 <= corners < 40320 in phase 2,
         corners = 0 for solved cube"""
-        perm = self.corners[:, 0].copy()
-        b = 0
-        for j in range(7, 0, -1):
-            idx = np.where(perm[: j + 1] == j)[0][0]
-            k = (idx + 1) % (j + 1)
-            perm[: j + 1] = np.roll(perm[: j + 1], -k)
-            b = (j + 1) * b + k
-        return b
+        return self.lc8.encode(self.corners[:, 0])
 
     def set_corners(self, idx: int):
-        self.corners[:, 0] = np.arange(8)
-        for j in range(8):
-            k = idx % (j + 1)
-            idx //= j + 1
-            self.corners[: j + 1, 0] = np.roll(self.corners[: j + 1, 0], k)
+        self.corners[:, 0] = self.lc8.decode(idx)
 
     def get_ud_edges(self) -> int:
         """Get the permutation of the 8 U and D edges.
@@ -663,14 +655,14 @@ class CubieCube:
         if len(cube_string) != 54:
             raise ValueError("Cube string must be 54 characters long")
 
-        color_chars = {x.value: x.name for x in Color}
+        char_colors = {x.name: x.value for x in Color}
         faces = np.zeros((6, 3, 3), dtype=np.uint8)
 
         idx = 0
         for face in range(6):
             for row in range(3):
                 for col in range(3):
-                    faces[face, row, col] = color_chars[cube_string[idx]]
+                    faces[face, row, col] = char_colors[cube_string[idx]]
                     idx += 1
 
         cube = Cube(initial=faces, size=3)
