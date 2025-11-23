@@ -77,7 +77,7 @@ class CubieCube:
         self, corners: np.ndarray | None = None, edges: np.ndarray | None = None
     ):
         """
-        params:
+        Args:
         - corners: shape (8, 2) -- first column: which corner, second column: orientation
         - edges: shape (12, 2) -- first column: which edge, second column: orientation
         - Orientations can be:
@@ -106,14 +106,14 @@ class CubieCube:
             self.edges = edges
 
     @staticmethod
-    def rotate_right(a: np.ndarray, left: int, right: int):
+    def rotate_right(a: np.ndarray, left: int, right: int, k: int = 1):
         """In-place rotate right of a[left:right]"""
-        a[left : right + 1] = np.roll(a[left : right + 1], 1)
+        a[left : right + 1] = np.roll(a[left : right + 1], k)
 
     @staticmethod
-    def rotate_left(a: np.ndarray, left: int, right: int):
+    def rotate_left(a: np.ndarray, left: int, right: int, k: int = 1):
         """In-place rotate left of a[left:right]"""
-        a[left : right + 1] = np.roll(a[left : right + 1], -1)
+        a[left : right + 1] = np.roll(a[left : right + 1], -k)
 
     @staticmethod
     def c_nk(n: int, k: int) -> int:
@@ -218,7 +218,7 @@ class CubieCube:
         powers = 3 ** np.arange(self.num_corners - 1)
         div = twist // powers
         twistparity = np.sum(self.corners[:-1, 1]) % 3
-        self.corners[:, 1] = np.concat(
+        self.corners[:, 1] = np.concatenate(
             [np.flip(np.mod(div, 3)), [(3 - twistparity) % 3]]
         )
 
@@ -231,7 +231,7 @@ class CubieCube:
         powers = 2 ** np.arange(self.num_edges - 1)
         div = flip // powers
         flipparity = np.sum(self.edges[:, 1]) % 2
-        self.edges[:, 1] = np.concat([np.flip(np.mod(div, 2)), [(2 - flipparity) % 2]])
+        self.edges[:, 1] = np.concatenate([np.flip(np.mod(div, 2)), [(2 - flipparity) % 2]])
 
     def get_slice(self) -> int:
         """Get the location of the UD-slice edges FR,FL,BL and BR ignoring their permutation.
@@ -256,7 +256,318 @@ class CubieCube:
         ep[mask] = self._other_edge[:np.sum(mask)]
         self.edges[:, 0] = ep
 
+    def get_slice_sorted(self) -> int:
+        """Get the permutation and location of the UD-slice edges FR,FL,BL and BR.
+        0 <= slice_sorted < 11880 in phase 1, 0 <= slice_sorted < 24 in phase 2, slice_sorted = 0 for solved cube."""
+        mask = (self.edges[:, 0] >= Edge.FR) & (self.edges[:, 0] <= Edge.BR)
+        indices = np.where(mask)[0]
+        j_indices = indices[::-1]
+
+        x = np.arange(len(j_indices))
+        a = np.sum(self._comb_vectorized(11 - j_indices, x + 1))
+
+        edge4 = self.edges[indices, 0]
+        b = 0
+        for j in range(3, 0, -1):
+            target = j + 8
+            idx = np.where(edge4[: j + 1] == target)[0][0]
+            k = (idx + 1) % (j + 1)
+            edge4[: j + 1] = np.roll(edge4[: j + 1], -k)
+            b = (j + 1) * b + k
+
+        return 24 * a + b
+
+    def set_slice_sorted(self, idx: int):
+        slice_edge = np.array([Edge.FR, Edge.FL, Edge.BL, Edge.BR])
+        other_edge = np.array(
+            [Edge.UR, Edge.UF, Edge.UL, Edge.UB, Edge.DR, Edge.DF, Edge.DL, Edge.DB]
+        )
+        b = idx % 24
+        a = idx // 24
+
+        ep = np.full(12, -1, dtype=int)
+
+        for j in range(1, 4):
+            k = b % (j + 1)
+            b //= j + 1
+            slice_edge[: j + 1] = np.roll(slice_edge[: j + 1], k)
+
+        x = 4
+        for j in range(12):
+            if x == 0:
+                break
+            comb = self.c_nk(11 - j, x)
+            if a >= comb:
+                ep[j] = slice_edge[4 - x]
+                a -= comb
+                x -= 1
+
+        mask = (ep == -1)
+        ep[mask] = other_edge
+        self.edges[:, 0] = ep
+
+    def get_u_edges(self) -> int:
+        """Get the permutation and location of edges UR, UF, UL and UB.
+        0 <= u_edges < 11880 in phase 1, 0 <= u_edges < 1680 in phase 2, u_edges = 1656 for solved cube."""
+        ep_mod = np.roll(self.edges[:, 0], 4)
+
+        mask = (ep_mod >= Edge.UR) & (ep_mod <= Edge.UB)
+        indices = np.where(mask)[0]
+        j_indices = indices[::-1]
+
+        x = np.arange(len(j_indices))
+        a = np.sum(self._comb_vectorized(11 - j_indices, x + 1))
+
+        edge4 = ep_mod[indices]
+        b = 0
+        for j in range(3, 0, -1):
+            target = j
+            idx = np.where(edge4[: j + 1] == target)[0][0]
+            k = (idx + 1) % (j + 1)
+            edge4[: j + 1] = np.roll(edge4[: j + 1], -k)
+            b = (j + 1) * b + k
+
+        return 24 * a + b
+
+    def set_u_edges(self, idx: int):
+        slice_edge = np.array([Edge.UR, Edge.UF, Edge.UL, Edge.UB])
+        other_edge = np.array(
+            [Edge.DR, Edge.DF, Edge.DL, Edge.DB, Edge.FR, Edge.FL, Edge.BL, Edge.BR]
+        )
+        b = idx % 24
+        a = idx // 24
+
+        ep = np.full(12, -1, dtype=int)
+
+        for j in range(1, 4):
+            k = b % (j + 1)
+            b //= j + 1
+            slice_edge[: j + 1] = np.roll(slice_edge[: j + 1], k)
+
+        x = 4
+        for j in range(12):
+            if x == 0:
+                break
+            comb = self.c_nk(11 - j, x)
+            if a >= comb:
+                ep[j] = slice_edge[4 - x]
+                a -= comb
+                x -= 1
+
+        mask = (ep == -1)
+        ep[mask] = other_edge
+        self.edges[:, 0] = np.roll(ep, -4)
+
+    def get_d_edges(self) -> int:
+        """Get the permutation and location of the edges DR, DF, DL and DB.
+        0 <= d_edges < 11880 in phase 1, 0 <= d_edges < 1680 in phase 2, d_edges = 0 for solved cube."""
+        ep_mod = np.roll(self.edges[:, 0], 4)
+
+        mask = (ep_mod >= Edge.DR) & (ep_mod <= Edge.DB)
+        indices = np.where(mask)[0]
+        j_indices = indices[::-1]
+
+        x = np.arange(len(j_indices))
+        a = np.sum(self._comb_vectorized(11 - j_indices, x + 1))
+
+        edge4 = ep_mod[indices]
+        b = 0
+        for j in range(3, 0, -1):
+            target = j + 4
+            idx = np.where(edge4[: j + 1] == target)[0][0]
+            k = (idx + 1) % (j + 1)
+            edge4[: j + 1] = np.roll(edge4[: j + 1], -k)
+            b = (j + 1) * b + k
+
+        return 24 * a + b
+
+    def set_d_edges(self, idx: int):
+        slice_edge = np.array([Edge.DR, Edge.DF, Edge.DL, Edge.DB])
+        other_edge = np.array(
+            [Edge.FR, Edge.FL, Edge.BL, Edge.BR, Edge.UR, Edge.UF, Edge.UL, Edge.UB]
+        )
+        b = idx % 24
+        a = idx // 24
+
+        ep = np.full(12, -1, dtype=int)
+
+        for j in range(1, 4):
+            k = b % (j + 1)
+            b //= j + 1
+            slice_edge[: j + 1] = np.roll(slice_edge[: j + 1], k)
+
+        x = 4
+        for j in range(12):
+            if x == 0:
+                break
+            comb = self.c_nk(11 - j, x)
+            if a >= comb:
+                ep[j] = slice_edge[4 - x]
+                a -= comb
+                x -= 1
+
+        mask = (ep == -1)
+        ep[mask] = other_edge
+        self.edges[:, 0] = np.roll(ep, -4)
+
+    def get_corners(self) -> int:
+        """Get the permutation of the 8 corners.
+        0 <= corners < 40320 defined but unused in phase 1, 0 <= corners < 40320 in phase 2,
+        corners = 0 for solved cube"""
+        perm = self.corners[:, 0].copy()
+        b = 0
+        for j in range(7, 0, -1):
+            idx = np.where(perm[: j + 1] == j)[0][0]
+            k = (idx + 1) % (j + 1)
+            perm[: j + 1] = np.roll(perm[: j + 1], -k)
+            b = (j + 1) * b + k
+        return b
+
+    def set_corners(self, idx: int):
+        self.corners[:, 0] = np.arange(8)
+        for j in range(8):
+            k = idx % (j + 1)
+            idx //= j + 1
+            self.corners[: j + 1, 0] = np.roll(self.corners[: j + 1, 0], k)
+
+    def get_ud_edges(self) -> int:
+        """Get the permutation of the 8 U and D edges.
+        ud_edges undefined in phase 1, 0 <= ud_edges < 40320 in phase 2, ud_edges = 0 for solved cube."""
+        perm = self.edges[0:8, 0].copy()
+        b = 0
+        for j in range(7, 0, -1):
+            idx = np.where(perm[: j + 1] == j)[0][0]
+            k = (idx + 1) % (j + 1)
+            perm[: j + 1] = np.roll(perm[: j + 1], -k)
+            b = (j + 1) * b + k
+        return b
+
+    def set_ud_edges(self, idx: int):
+        # positions of FR FL BL BR edges are not affected
+        self.edges[0:8, 0] = np.arange(8)
+        for j in range(8):
+            k = idx % (j + 1)
+            idx //= j + 1
+            self.edges[: j + 1, 0] = np.roll(self.edges[: j + 1, 0], k)
     # --- End of coordinate functions ---
+
+    def from_cube(self, cube: Cube):
+        """Update this CubieCube from a Facelet Cube."""
+        # Corner facelet positions
+        corner_facelets = [
+            [(0, 2, 2), (1, 0, 0), (2, 0, 2)],  # Corner URF: U-R-F
+            [(0, 2, 0), (2, 0, 0), (4, 0, 2)],  # Corner UFL: U-F-L
+            [(0, 0, 0), (4, 0, 0), (5, 0, 2)],  # Corner ULB: U-L-B
+            [(0, 0, 2), (5, 0, 0), (1, 0, 2)],  # Corner UBR: U-B-R
+            [(3, 0, 2), (2, 2, 2), (1, 2, 0)],  # Corner DFR: D-F-R
+            [(3, 0, 0), (4, 2, 2), (2, 2, 0)],  # Corner DLF: D-L-F
+            [(3, 2, 0), (5, 2, 2), (4, 2, 0)],  # Corner DBL: D-B-L
+            [(3, 2, 2), (1, 2, 2), (5, 2, 0)],  # Corner DRB: D-R-B
+        ]
+
+        # Edge facelet positions
+        edge_facelets = [
+            [(0, 1, 2), (1, 0, 1)],  # Edge UR: U-R
+            [(0, 2, 1), (2, 0, 1)],  # Edge UF: U-F
+            [(0, 1, 0), (4, 0, 1)],  # Edge UL: U-L
+            [(0, 0, 1), (5, 0, 1)],  # Edge UB: U-B
+            [(3, 1, 2), (1, 2, 1)],  # Edge DR: D-R
+            [(3, 0, 1), (2, 2, 1)],  # Edge DF: D-F
+            [(3, 1, 0), (4, 2, 1)],  # Edge DL: D-L
+            [(3, 2, 1), (5, 2, 1)],  # Edge DB: D-B
+            [(2, 1, 2), (1, 1, 0)],  # Edge FR: F-R
+            [(2, 1, 0), (4, 1, 2)],  # Edge FL: F-L
+            [(5, 1, 2), (4, 1, 0)],  # Edge BL: B-L
+            [(5, 1, 0), (1, 1, 2)],  # Edge BR: B-R
+        ]
+
+        # Map sets of colors to piece indices
+        corner_colors_map = {}
+        for i in range(8):
+            # corner_facelets[i] contains (face, row, col).
+            # The color of that facelet in a solved cube is simply `face`.
+            colors = tuple(sorted([f[0] for f in corner_facelets[i]]))
+            corner_colors_map[colors] = i
+
+        edge_colors_map = {}
+        for i in range(12):
+            colors = tuple(sorted([f[0] for f in edge_facelets[i]]))
+            edge_colors_map[colors] = i
+
+        # Process Corners
+        for i in range(8):
+            # Read colors from the cube at the positions for corner i
+            obs_colors = []
+            for f, r, c in corner_facelets[i]:
+                obs_colors.append(cube.faces[f, r, c])
+
+            # Identify the piece
+            piece_idx = corner_colors_map.get(tuple(sorted(obs_colors)))
+            if piece_idx is None:
+                raise ValueError(
+                    f"Invalid corner colors at position {Corner(i).name}: {obs_colors}"
+                )
+
+            self.corners[i, 0] = piece_idx
+
+            # Identify orientation
+            # The primary color of the piece is the one on the U(0) or D(3) face in the solved state.
+            # For corner `piece_idx`, the primary color is `corner_facelets[piece_idx][0][0]`.
+            primary_color = corner_facelets[piece_idx][0][0]
+
+            # Find where this primary color is in the observed colors
+            # obs_colors are [U/D, R/L/F/B, F/B/L/R] relative to the corner position
+
+            if obs_colors[0] == primary_color:
+                self.corners[i, 1] = 0
+            elif obs_colors[1] == primary_color:
+                self.corners[i, 1] = 1
+            elif obs_colors[2] == primary_color:
+                self.corners[i, 1] = 2
+            else:
+                found = False
+                for idx, color in enumerate(obs_colors):
+                    if color == 0 or color == 3:
+                        if idx == 0:
+                            self.corners[i, 1] = 0
+                        elif idx == 1:
+                            self.corners[i, 1] = 2
+                        elif idx == 2:
+                            self.corners[i, 1] = 1
+                        found = True
+                        break
+
+                if not found:
+                     raise ValueError(
+                        f"Primary color {primary_color} not found in observed colors {obs_colors}"
+                    )
+
+        # Process Edges
+        for i in range(12):
+            obs_colors = []
+            for f, r, c in edge_facelets[i]:
+                obs_colors.append(cube.faces[f, r, c])
+
+            piece_idx = edge_colors_map.get(tuple(sorted(obs_colors)))
+            if piece_idx is None:
+                raise ValueError(
+                    f"Invalid edge colors at position {Edge(i).name}: {obs_colors}"
+                )
+
+            self.edges[i, 0] = piece_idx
+
+            # Identify orientation
+            # Primary color is `edge_facelets[piece_idx][0][0]`
+            primary_color = edge_facelets[piece_idx][0][0]
+
+            if obs_colors[0] == primary_color:
+                self.edges[i, 1] = 0
+            elif obs_colors[1] == primary_color:
+                self.edges[i, 1] = 1
+            else:
+                raise ValueError(
+                    f"Primary color {primary_color} not found in observed colors {obs_colors}"
+                )
 
     def to_cube(self) -> Cube:
         """Convert this CubieCube representation to a Facelet Cube representation."""
@@ -268,14 +579,14 @@ class CubieCube:
         # Each corner has 3 facelets, listed in clockwise order when viewed from outside
         # Face order: U=0, R=1, F=2, D=3, L=4, B=5
         corner_facelets = [
-            [(0, 2, 2), (1, 0, 2), (2, 0, 2)],  # Corner URF: U-R-F
-            [(0, 2, 0), (2, 0, 0), (4, 0, 0)],  # Corner UFL: U-F-L
-            [(0, 0, 0), (4, 0, 2), (5, 0, 0)],  # Corner ULB: U-L-B
-            [(0, 0, 2), (5, 0, 2), (1, 0, 0)],  # Corner UBR: U-B-R
-            [(3, 2, 2), (2, 2, 2), (1, 2, 0)],  # Corner DFR: D-F-R
-            [(3, 2, 0), (4, 2, 2), (2, 2, 0)],  # Corner DLF: D-L-F
-            [(3, 0, 0), (5, 2, 0), (4, 2, 0)],  # Corner DBL: D-B-L
-            [(3, 0, 2), (1, 2, 2), (5, 2, 2)],  # Corner DRB: D-R-B
+            [(0, 2, 2), (1, 0, 0), (2, 0, 2)],  # Corner URF: U-R-F
+            [(0, 2, 0), (2, 0, 0), (4, 0, 2)],  # Corner UFL: U-F-L
+            [(0, 0, 0), (4, 0, 0), (5, 0, 2)],  # Corner ULB: U-L-B
+            [(0, 0, 2), (5, 0, 0), (1, 0, 2)],  # Corner UBR: U-B-R
+            [(3, 0, 2), (2, 2, 2), (1, 2, 0)],  # Corner DFR: D-F-R
+            [(3, 0, 0), (4, 2, 2), (2, 2, 0)],  # Corner DLF: D-L-F
+            [(3, 2, 0), (5, 2, 2), (4, 2, 0)],  # Corner DBL: D-B-L
+            [(3, 2, 2), (1, 2, 2), (5, 2, 0)],  # Corner DRB: D-R-B
         ]
 
         # Each edge has 2 facelets
@@ -285,13 +596,13 @@ class CubieCube:
             [(0, 1, 0), (4, 0, 1)],  # Edge UL: U-L
             [(0, 0, 1), (5, 0, 1)],  # Edge UB: U-B
             [(3, 1, 2), (1, 2, 1)],  # Edge DR: D-R
-            [(3, 2, 1), (2, 2, 1)],  # Edge DF: D-F
+            [(3, 0, 1), (2, 2, 1)],  # Edge DF: D-F
             [(3, 1, 0), (4, 2, 1)],  # Edge DL: D-L
-            [(3, 0, 1), (5, 2, 1)],  # Edge DB: D-B
-            [(2, 1, 2), (1, 1, 2)],  # Edge FR: F-R
-            [(2, 1, 0), (4, 1, 0)],  # Edge FL: F-L
-            [(5, 1, 0), (4, 1, 2)],  # Edge BL: B-L
-            [(5, 1, 2), (1, 1, 0)],  # Edge BR: B-R
+            [(3, 2, 1), (5, 2, 1)],  # Edge DB: D-B
+            [(2, 1, 2), (1, 1, 0)],  # Edge FR: F-R
+            [(2, 1, 0), (4, 1, 2)],  # Edge FL: F-L
+            [(5, 1, 2), (4, 1, 0)],  # Edge BL: B-L
+            [(5, 1, 0), (1, 1, 2)],  # Edge BR: B-R
         ]
 
         # Set center facelets (they don't move)
@@ -302,31 +613,68 @@ class CubieCube:
             corner_pos = self.corners[i, 0]
             orientation = self.corners[i, 1]
 
-            facelets = corner_facelets[corner_pos]
+            # Get colors of the piece (from its solved position)
+            piece_facelets = corner_facelets[corner_pos]
+            colors = [piece_facelets[j][0] for j in range(3)]  # Original face colors
 
-            colors = [facelets[j][0] for j in range(3)]  # Original face colors
-            rotated_colors = colors[orientation:] + colors[:orientation]
+            # Apply orientation
+            rotated_colors = colors[-orientation:] + colors[:-orientation]
 
+            # Write to the current position i
+            target_facelets = corner_facelets[i]
             for j in range(3):
-                face, row, col = facelets[j]
+                face, row, col = target_facelets[j]
                 faces[face, row, col] = rotated_colors[j]
 
         for i in range(self.num_edges):
             edge_pos = self.edges[i, 0]
             orientation = self.edges[i, 1]
 
-            facelets = edge_facelets[edge_pos]
+            # Get colors of the piece
+            piece_facelets = edge_facelets[edge_pos]
+            colors = [piece_facelets[j][0] for j in range(2)]
 
-            colors = [facelets[j][0] for j in range(2)]
             if orientation == 1:
                 colors = colors[::-1]
 
+            # Write to the current position i
+            target_facelets = edge_facelets[i]
             for j in range(2):
-                face, row, col = facelets[j]
+                face, row, col = target_facelets[j]
                 faces[face, row, col] = colors[j]
 
         cube = Cube(initial=faces, size=3)
         return cube
+
+    def to_string(self) -> str:
+        """Convert to facelet string format: U1-U9, R1-R9, F1-F9, D1-D9, L1-L9, B1-B9"""
+        cube = self.to_cube()
+        s = ""
+        color_chars = {x.value: x.name for x in Color}
+
+        for face in range(6):
+            for row in range(3):
+                for col in range(3):
+                    s += color_chars[cube.faces[face, row, col]]
+        return s
+
+    def from_string(self, cube_string: str):
+        """Load from facelet string format: U1-U9, R1-R9, F1-F9, D1-D9, L1-L9, B1-B9"""
+        if len(cube_string) != 54:
+            raise ValueError("Cube string must be 54 characters long")
+
+        color_chars = {x.value: x.name for x in Color}
+        faces = np.zeros((6, 3, 3), dtype=np.uint8)
+
+        idx = 0
+        for face in range(6):
+            for row in range(3):
+                for col in range(3):
+                    faces[face, row, col] = color_chars[cube_string[idx]]
+                    idx += 1
+
+        cube = Cube(initial=faces, size=3)
+        self.from_cube(cube)
 
 
 # ------
