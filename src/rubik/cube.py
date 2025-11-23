@@ -212,7 +212,7 @@ class Cube:
         number_of_scramble_moves: int = 10,
     ):
         self.size = size
-        self.rotations = default_rotations
+        self.rotations = default_rotations.copy()
         if size == 3:
             self.rotations |= cube_3_additional_rotations
         self.rotations |= {
