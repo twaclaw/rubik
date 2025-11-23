@@ -106,7 +106,8 @@ class CubieCube:
         else:
             self.edges = edges
 
-        self.lc8 = Lehmer(n=8, squeeze=True) # Lehmer code class for corners
+        self.lc8 = Lehmer(n=8, squeeze=True, dtype=np.uint16) # for corners
+        self.lc4 = Lehmer(n=4, squeeze=True, dtype=np.uint8) # for UD edges
 
     @staticmethod
     def rotate_right(a: np.ndarray, left: int, right: int, k: int = 1):
@@ -270,18 +271,10 @@ class CubieCube:
         a = np.sum(self._comb_vectorized(11 - j_indices, x + 1))
 
         edge4 = self.edges[indices, 0]
-        b = 0
-        for j in range(3, 0, -1):
-            target = j + 8
-            idx = np.where(edge4[: j + 1] == target)[0][0]
-            k = (idx + 1) % (j + 1)
-            edge4[: j + 1] = np.roll(edge4[: j + 1], -k)
-            b = (j + 1) * b + k
-
+        b = self.lc4.encode(edge4)
         return 24 * a + b
 
     def set_slice_sorted(self, idx: int):
-        slice_edge = np.array([Edge.FR, Edge.FL, Edge.BL, Edge.BR])
         other_edge = np.array(
             [Edge.UR, Edge.UF, Edge.UL, Edge.UB, Edge.DR, Edge.DF, Edge.DL, Edge.DB]
         )
@@ -290,10 +283,7 @@ class CubieCube:
 
         ep = np.full(12, -1, dtype=int)
 
-        for j in range(1, 4):
-            k = b % (j + 1)
-            b //= j + 1
-            slice_edge[: j + 1] = np.roll(slice_edge[: j + 1], k)
+        slice_edge = self.lc4.decode(b, minvalue=Edge.FR)
 
         x = 4
         for j in range(12):

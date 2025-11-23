@@ -99,6 +99,12 @@ class TestCubie:
             cube.set_slice(i)
             assert i == cube.get_slice()
 
+    def test_slice_sorted(self):
+        cube = CubieCube()
+        for i in range(11880):
+            cube.set_slice_sorted(i)
+            assert i == cube.get_slice_sorted()
+
     def test_aux_functions(self):
         cube = CubieCube()
         N = 20
