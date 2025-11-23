@@ -221,6 +221,15 @@ class Cube:
         self.possible_moves = np.array(list(self.rotations.keys()))
         self.basic_moves = np.array(list(default_rotations.keys()))
 
+        if self.size == 2:
+            # For 2x2, fix the DBL corner to avoid visiting rotationally equivalent states.
+            # Only allow moves U, R, F (and their inverses).
+            allowed_moves = [Move.F, Move.R, Move.U]
+            allowed_moves += [m.inverse() for m in allowed_moves]
+            self.possible_moves = np.array(allowed_moves)
+
+
+
         if isinstance(initial, np.ndarray):
             self.faces = initial.copy()
         elif isinstance(initial, str) and (initial == "random" or initial == "solved"):
