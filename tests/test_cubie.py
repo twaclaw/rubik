@@ -7,23 +7,22 @@ from rubik.cubie_cube import BasicMoves, Color, CubieCube
 
 class TestCubie:
     def test_cube_conversions(self):
-        c1 = Cube(initial="solved") # create facelet cube
-        cc = CubieCube() # create cubie cube
+        c1 = Cube(initial="solved")  # create facelet cube
+        cc = CubieCube()  # create cubie cube
         cc2 = cc.copy()
-        cc.from_cube(c1) # convert facelet cube to cubie cube
-        s1 = cc.to_string() # convert cubie cube to string
-        cc2.from_string(s1) # create new cubie cube from string
-        c2 = cc2.to_cube() # convert back to facelet cube
+        cc.from_cube(c1)  # convert facelet cube to cubie cube
+        s1 = cc.to_string()  # convert cubie cube to string
+        cc2.from_string(s1)  # create new cubie cube from string
+        c2 = cc2.to_cube()  # convert back to facelet cube
         assert (c1.faces == c2.faces).all()
 
         for i in range(20):
-            c1 = Cube(initial="random", number_of_scramble_moves=i+10)
+            c1 = Cube(initial="random", number_of_scramble_moves=i + 10)
             cc.from_cube(c1)
             s1 = cc.to_string()
             cc2.from_string(s1)
             c2 = cc2.to_cube()
             assert (c1.faces == c2.faces).all()
-
 
     @pytest.mark.parametrize(
         "test_cases",
@@ -105,6 +104,18 @@ class TestCubie:
             cube.set_slice_sorted(i)
             assert i == cube.get_slice_sorted()
 
+    def test_u_edges(self):
+        cube = CubieCube()
+        for i in range(11880):
+            cube.set_u_edges(i)
+            assert i == cube.get_u_edges()
+
+    def test_ud_edges(self):
+        cube = CubieCube()
+        for i in range(40320):
+            cube.set_ud_edges(i)
+            assert i == cube.get_ud_edges()
+
     def test_aux_functions(self):
         cube = CubieCube()
         N = 20
@@ -117,7 +128,7 @@ class TestCubie:
                 cube.rotate_left(a, right, left)
                 assert np.array_equal(a0, a)
 
-    def test_set_get_corners(self):
+    def test_corners(self):
         cube = CubieCube()
         for i in range(40320):
             cube.set_corners(i)

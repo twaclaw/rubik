@@ -312,18 +312,10 @@ class CubieCube:
         a = np.sum(self._comb_vectorized(11 - j_indices, x + 1))
 
         edge4 = ep_mod[indices]
-        b = 0
-        for j in range(3, 0, -1):
-            target = j
-            idx = np.where(edge4[: j + 1] == target)[0][0]
-            k = (idx + 1) % (j + 1)
-            edge4[: j + 1] = np.roll(edge4[: j + 1], -k)
-            b = (j + 1) * b + k
-
+        b = self.lc4.encode(edge4)
         return 24 * a + b
 
     def set_u_edges(self, idx: int):
-        slice_edge = np.array([Edge.UR, Edge.UF, Edge.UL, Edge.UB])
         other_edge = np.array(
             [Edge.DR, Edge.DF, Edge.DL, Edge.DB, Edge.FR, Edge.FL, Edge.BL, Edge.BR]
         )
@@ -331,11 +323,7 @@ class CubieCube:
         a = idx // 24
 
         ep = np.full(12, -1, dtype=int)
-
-        for j in range(1, 4):
-            k = b % (j + 1)
-            b //= j + 1
-            slice_edge[: j + 1] = np.roll(slice_edge[: j + 1], k)
+        slice_edge  = self.lc4.decode(b, minvalue=Edge.UR)
 
         x = 4
         for j in range(12):
@@ -416,21 +404,12 @@ class CubieCube:
         """Get the permutation of the 8 U and D edges.
         ud_edges undefined in phase 1, 0 <= ud_edges < 40320 in phase 2, ud_edges = 0 for solved cube."""
         perm = self.edges[0:8, 0].copy()
-        b = 0
-        for j in range(7, 0, -1):
-            idx = np.where(perm[: j + 1] == j)[0][0]
-            k = (idx + 1) % (j + 1)
-            perm[: j + 1] = np.roll(perm[: j + 1], -k)
-            b = (j + 1) * b + k
-        return b
+        return self.lc8.encode(perm)
 
     def set_ud_edges(self, idx: int):
         # positions of FR FL BL BR edges are not affected
-        self.edges[0:8, 0] = np.arange(8)
-        for j in range(8):
-            k = idx % (j + 1)
-            idx //= j + 1
-            self.edges[: j + 1, 0] = np.roll(self.edges[: j + 1, 0], k)
+        self.edges[0:8, 0] = self.lc8.decode(idx)
+
     # --- End of coordinate functions ---
 
     def from_cube(self, cube: Cube):
