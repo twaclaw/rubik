@@ -110,6 +110,12 @@ class TestCubie:
             cube.set_u_edges(i)
             assert i == cube.get_u_edges()
 
+    def test_d_edges(self):
+        cube = CubieCube()
+        for i in range(11880):
+            cube.set_d_edges(i)
+            assert i == cube.get_d_edges()
+
     def test_ud_edges(self):
         cube = CubieCube()
         for i in range(40320):
