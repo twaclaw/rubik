@@ -1,7 +1,4 @@
 """
-This implementation follows the implementation by Herbert Kociemba.
-https://github.com/hkociemba/RubiksCube-TwophaseSolver.git
-
                 ┌────┬────┬────┐
                 │ U1 │ U2 │ U3 │
                 ├────┼────┼────┤
@@ -88,13 +85,13 @@ class CubieCube:
         """
         self.num_corners = 8
         self.num_edges = 12
-        self._comb_vectorized = np.vectorize(
-            self.c_nk
-        )  # TODO: consider using scipy.special.comb
+        self._comb_vectorized = np.vectorize(self.c_nk)
 
         # used for slice coordinate calculations
         self._slice_edge = np.array([Edge.FR, Edge.FL, Edge.BL, Edge.BR])
-        self._other_edge = np.array([Edge.UR, Edge.UF, Edge.UL, Edge.UB, Edge.DR, Edge.DF, Edge.DL, Edge.DB])
+        self._other_edge = np.array(
+            [Edge.UR, Edge.UF, Edge.UL, Edge.UB, Edge.DR, Edge.DF, Edge.DL, Edge.DB]
+        )
 
         if corners is None:
             self.corners = np.array([[Corner(i), 0] for i in range(8)], dtype=int)
@@ -106,18 +103,8 @@ class CubieCube:
         else:
             self.edges = edges
 
-        self.lc8 = Lehmer(n=8, squeeze=True, dtype=np.uint16) # for corners
-        self.lc4 = Lehmer(n=4, squeeze=True, dtype=np.uint8) # for UD edges
-
-    @staticmethod
-    def rotate_right(a: np.ndarray, left: int, right: int, k: int = 1):
-        """In-place rotate right of a[left:right]"""
-        a[left : right + 1] = np.roll(a[left : right + 1], k)
-
-    @staticmethod
-    def rotate_left(a: np.ndarray, left: int, right: int, k: int = 1):
-        """In-place rotate left of a[left:right]"""
-        a[left : right + 1] = np.roll(a[left : right + 1], -k)
+        self.lc8 = Lehmer(n=8, squeeze=True, dtype=np.uint16)  # for corners
+        self.lc4 = Lehmer(n=4, squeeze=True, dtype=np.uint8)  # for UD edges
 
     @staticmethod
     def c_nk(n: int, k: int) -> int:
@@ -177,7 +164,7 @@ class CubieCube:
 
     def edge_multiply(self, other: "CubieCube") -> None:
         """Multiply this cubie cube with another cubie cube b, restricted to the edges. Does not change b."""
-        ep_a = self.edges[:, 0]  # permuatation
+        ep_a = self.edges[:, 0]  # permutation
         eo_a = self.edges[:, 1]  # orientation
         ep_b = other.edges[:, 0]
         eo_b = other.edges[:, 1]
@@ -221,10 +208,9 @@ class CubieCube:
         """Set the corner orientations of this CubieCube from the given twist coordinate."""
         powers = 3 ** np.arange(self.num_corners - 1)
         div = twist // powers
-        twistparity = np.sum(self.corners[:-1, 1]) % 3
-        self.corners[:, 1] = np.concatenate(
-            [np.flip(np.mod(div, 3)), [(3 - twistparity) % 3]]
-        )
+        new_corners_1 = np.flip(np.mod(div, 3))
+        twistparity = np.sum(new_corners_1) % 3
+        self.corners[:, 1] = np.concatenate([new_corners_1, [(3 - twistparity) % 3]])
 
     def get_flip(self) -> int:
         """Compute the flip coordinate (edge orientations) of this CubieCube."""
@@ -234,30 +220,34 @@ class CubieCube:
         """Set the edge orientations of this CubieCube from the given flip coordinate."""
         powers = 2 ** np.arange(self.num_edges - 1)
         div = flip // powers
-        flipparity = np.sum(self.edges[:, 1]) % 2
-        self.edges[:, 1] = np.concatenate([np.flip(np.mod(div, 2)), [(2 - flipparity) % 2]])
+        new_edges_1 = np.flip(np.mod(div, 2))
+        flipparity = np.sum(new_edges_1) % 2
+        self.edges[:, 1] = np.concatenate([new_edges_1, [(2 - flipparity) % 2]])
 
     def get_slice(self) -> int:
         """Get the location of the UD-slice edges FR,FL,BL and BR ignoring their permutation.
         0<= slice < 495 in phase 1, slice = 0 in phase 2."""
         mask = (self.edges[:, 0] >= Edge.FR) & (self.edges[:, 0] <= Edge.BR)
-        j = np.where(mask)[0][::-1] # flipped order
+        j = np.where(mask)[0][::-1]  # flipped order
         x = np.arange(len(j))
         return np.sum(self._comb_vectorized(11 - j, x + 1))
 
     def set_slice(self, idx: int):
-        ep = np.full(12, -1, dtype=np.int8) # invalidate all edge positions
+        idx = int(idx)
+        ep = np.full(12, -1, dtype=np.int8)  # invalidate all edge positions
         x = 4
-        #TODO: check if this can be optimized
+        # TODO: check if this can be optimized
         for j in np.arange(self.num_edges):
+            if x == 0:
+                break
             comb = self.c_nk(11 - j, x)
             if idx - comb >= 0:
                 ep[j] = self._slice_edge[4 - x]
                 idx -= comb
                 x -= 1
 
-        mask = (ep == -1)
-        ep[mask] = self._other_edge[:np.sum(mask)]
+        mask = ep == -1
+        ep[mask] = self._other_edge[: np.sum(mask)]
         self.edges[:, 0] = ep
 
     def get_slice_sorted(self) -> int:
@@ -295,7 +285,7 @@ class CubieCube:
                 a -= comb
                 x -= 1
 
-        mask = (ep == -1)
+        mask = ep == -1
         ep[mask] = other_edge
         self.edges[:, 0] = ep
 
@@ -323,7 +313,7 @@ class CubieCube:
         a = idx // 24
 
         ep = np.full(12, -1, dtype=int)
-        slice_edge  = self.lc4.decode(b, minvalue=Edge.UR)
+        slice_edge = self.lc4.decode(b, minvalue=Edge.UR)
 
         x = 4
         for j in range(12):
@@ -335,7 +325,7 @@ class CubieCube:
                 a -= comb
                 x -= 1
 
-        mask = (ep == -1)
+        mask = ep == -1
         ep[mask] = other_edge
         self.edges[:, 0] = np.roll(ep, -4)
 
@@ -375,7 +365,7 @@ class CubieCube:
                 a -= comb
                 x -= 1
 
-        mask = (ep == -1)
+        mask = ep == -1
         ep[mask] = other_edge
         self.edges[:, 0] = np.roll(ep, -4)
 
@@ -401,7 +391,13 @@ class CubieCube:
     # --- End of coordinate functions ---
 
     def from_cube(self, cube: Cube):
-        """Update this CubieCube from a Facelet Cube."""
+        """Update this CubieCube from a Facelet Cube.
+
+        Args:
+        - cube: a cube in Cube (Facelet) representation.
+          Cube is the Facelet representation I used for illustrating other algorithms: e.g., BFS.
+          Cube is also the representation used to graphically display the cube on the terminal.
+        """
         # Corner facelet positions
         corner_facelets = [
             [(0, 2, 2), (1, 0, 0), (2, 0, 2)],  # Corner URF: U-R-F
@@ -487,7 +483,7 @@ class CubieCube:
                         break
 
                 if not found:
-                     raise ValueError(
+                    raise ValueError(
                         f"Primary color {primary_color} not found in observed colors {obs_colors}"
                     )
 
@@ -519,7 +515,13 @@ class CubieCube:
                 )
 
     def to_cube(self) -> Cube:
-        """Convert this CubieCube representation to a Facelet Cube representation."""
+        """Convert this CubieCube representation to a Facelet Cube representation.
+
+        Returns:
+        - cube: a cube in Cube (Facelet) representation.
+          Cube is the Facelet representation I used for illustrating other algorithms: e.g., BFS.
+          Cube is also the representation used to graphically display the cube on the terminal.
+        """
 
         # Initialize faces array
         faces = np.zeros((6, 3, 3), dtype=np.uint8)
