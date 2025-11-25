@@ -23,12 +23,17 @@
 """
 
 import math
+import os
 from enum import IntEnum
+from os import path
 
 import numpy as np
 from lehmer import Lehmer
+from rich.progress import track
+from rich.self.console import Console
 
-from .cube import Cube
+from rubik.cube import Cube
+from rubik.defs import Constants as k
 
 
 class Color(IntEnum):
@@ -38,6 +43,35 @@ class Color(IntEnum):
     D = 3  # Down
     L = 4  # Left
     B = 5  # Back
+
+
+# Map the corner positions to facelet colors.
+cornerColor = [
+    [Color.U, Color.R, Color.F],
+    [Color.U, Color.F, Color.L],
+    [Color.U, Color.L, Color.B],
+    [Color.U, Color.B, Color.R],
+    [Color.D, Color.F, Color.R],
+    [Color.D, Color.L, Color.F],
+    [Color.D, Color.B, Color.L],
+    [Color.D, Color.R, Color.B],
+]
+
+# Map the edge positions to facelet colors.
+edgeColor = [
+    [Color.U, Color.R],
+    [Color.U, Color.F],
+    [Color.U, Color.L],
+    [Color.U, Color.B],
+    [Color.D, Color.R],
+    [Color.D, Color.F],
+    [Color.D, Color.L],
+    [Color.D, Color.B],
+    [Color.F, Color.R],
+    [Color.F, Color.L],
+    [Color.B, Color.L],
+    [Color.B, Color.R],
+]
 
 
 class Corner(IntEnum):
@@ -198,7 +232,22 @@ class CubieCube:
 
         return inv
 
-    # Functions defining coordinates for two-phase algorithm
+    def symmetries(self) -> list[int]:
+        """Generate a list of the symmetries and antisymmetries of the cubie cube."""
+        s = []
+        for j in range(k.N_SYM):
+            c = CubieCube(symCube[j].corners.copy(), symCube[j].edges.copy())
+            c.multiply(self)
+            c.multiply(symCube[inv_idx[j]])
+            if self == c:
+                s.append(j)
+
+            d = c.inverse()
+            if self == d:  # then we have antisymmetry
+                s.append(j + k.N_SYM)
+        return s
+
+    # -------- Beginning of coordinate functions --------
 
     def get_twist(self) -> int:
         """Compute the twist coordinate (corner orientations) of this CubieCube."""
@@ -831,3 +880,439 @@ BasicMoves: dict[Color, CubieCube] = {
     Color.L: L_MOVE,
     Color.B: B_MOVE,
 }
+
+# -----------------------------------------------------------------------------------------------------------------
+# ---------------------------------------- Basic Symmetries -------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------
+
+# 120° clockwise rotation around the long diagonal URF-DBL
+cpROT_URF3 = [
+    Corner.URF,
+    Corner.DFR,
+    Corner.DLF,
+    Corner.UFL,
+    Corner.UBR,
+    Corner.DRB,
+    Corner.DBL,
+    Corner.ULB,
+]
+coROT_URF3 = [1, 2, 1, 2, 2, 1, 2, 1]
+epROT_URF3 = [
+    Edge.UF,
+    Edge.FR,
+    Edge.DF,
+    Edge.FL,
+    Edge.UB,
+    Edge.BR,
+    Edge.DB,
+    Edge.BL,
+    Edge.UR,
+    Edge.DR,
+    Edge.DL,
+    Edge.UL,
+]
+eoROT_URF3 = [1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1]
+
+# 180° rotation around the axis through the F and B centers
+cpROT_F2 = [
+    Corner.DLF,
+    Corner.DFR,
+    Corner.DRB,
+    Corner.DBL,
+    Corner.UFL,
+    Corner.URF,
+    Corner.UBR,
+    Corner.ULB,
+]
+coROT_F2 = [0, 0, 0, 0, 0, 0, 0, 0]
+epROT_F2 = [
+    Edge.DL,
+    Edge.DF,
+    Edge.DR,
+    Edge.DB,
+    Edge.UL,
+    Edge.UF,
+    Edge.UR,
+    Edge.UB,
+    Edge.FL,
+    Edge.FR,
+    Edge.BR,
+    Edge.BL,
+]
+eoROT_F2 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+# 90° clockwise rotation around the axis through the U and D centers
+cpROT_U4 = [
+    Corner.UBR,
+    Corner.URF,
+    Corner.UFL,
+    Corner.ULB,
+    Corner.DRB,
+    Corner.DFR,
+    Corner.DLF,
+    Corner.DBL,
+]
+coROT_U4 = [0, 0, 0, 0, 0, 0, 0, 0]
+epROT_U4 = [
+    Edge.UB,
+    Edge.UR,
+    Edge.UF,
+    Edge.UL,
+    Edge.DB,
+    Edge.DR,
+    Edge.DF,
+    Edge.DL,
+    Edge.BR,
+    Edge.FR,
+    Edge.FL,
+    Edge.BL,
+]
+eoROT_U4 = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1]
+
+# reflection at the plane through the U, D, F, B centers
+cpMIRR_LR2 = [
+    Corner.UFL,
+    Corner.URF,
+    Corner.UBR,
+    Corner.ULB,
+    Corner.DLF,
+    Corner.DFR,
+    Corner.DRB,
+    Corner.DBL,
+]
+coMIRR_LR2 = [3, 3, 3, 3, 3, 3, 3, 3]
+epMIRR_LR2 = [
+    Edge.UL,
+    Edge.UF,
+    Edge.UR,
+    Edge.UB,
+    Edge.DL,
+    Edge.DF,
+    Edge.DR,
+    Edge.DB,
+    Edge.FL,
+    Edge.FR,
+    Edge.BR,
+    Edge.BL,
+]
+eoMIRR_LR2 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+
+class BS(IntEnum):
+    ROT_URF3 = 0
+    ROT_F2 = 1
+    ROT_U4 = 2
+    MIRR_LR2 = 3
+
+
+basicSymCube = [CubieCube()] * 4
+basicSymCube[BS.ROT_URF3] = CubieCube(
+    np.array([[c, o] for c, o in zip(cpROT_URF3, coROT_URF3)]),
+    np.array([[e, o] for e, o in zip(epROT_URF3, eoROT_URF3)]),
+)
+basicSymCube[BS.ROT_F2] = CubieCube(
+    np.array([[c, o] for c, o in zip(cpROT_F2, coROT_F2)]),
+    np.array([[e, o] for e, o in zip(epROT_F2, eoROT_F2)]),
+)
+basicSymCube[BS.ROT_U4] = CubieCube(
+    np.array([[c, o] for c, o in zip(cpROT_U4, coROT_U4)]),
+    np.array([[e, o] for e, o in zip(epROT_U4, eoROT_U4)]),
+)
+basicSymCube[BS.MIRR_LR2] = CubieCube(
+    np.array([[c, o] for c, o in zip(cpMIRR_LR2, coMIRR_LR2)]),
+    np.array([[e, o] for e, o in zip(epMIRR_LR2, eoMIRR_LR2)]),
+)
+
+# ######################################## Fill SymCube list ###########################################################
+
+# 48 CubieCubes will represent the 48 cube symmetries
+symCube = []
+cc = CubieCube()  # Identity cube
+for urf3 in range(3):
+    for f2 in range(2):
+        for u4 in range(4):
+            for lr2 in range(2):
+                symCube.append(CubieCube(cc.corners.copy(), cc.edges.copy()))
+                cc.multiply(basicSymCube[BS.MIRR_LR2])
+            cc.multiply(basicSymCube[BS.ROT_U4])
+        cc.multiply(basicSymCube[BS.ROT_F2])
+    cc.multiply(basicSymCube[BS.ROT_URF3])
+########################################################################################################################
+
+# ########################################## Fill the inv_idx array ####################################################
+
+# Indices for the inverse symmetries: SymCube[inv_idx[idx]] == SymCube[idx]^(-1)
+inv_idx = np.zeros(k.N_SYM, dtype=np.uint8)
+for j in range(k.N_SYM):
+    for i in range(k.N_SYM):
+        cc = CubieCube(symCube[j].corners.copy(), symCube[j].edges.copy())
+        cc.corner_multiply(symCube[i])
+        if (
+            cc.corners[Corner.URF, 0] == Corner.URF
+            and cc.corners[Corner.UFL, 0] == Corner.UFL
+            and cc.corners[Corner.ULB, 0] == Corner.ULB
+        ):
+            inv_idx[j] = i
+            break
+########################################################################################################################
+
+
+class Symmetries:
+    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True):
+        self.folder = folder
+        self.show_progress = show_progress
+        self.self.console = Console()  # use for pretty printing and progress bars
+
+        if not os.path.exists(self.folder):
+            os.mkdir(self.folder)
+
+    def create_tables(self):
+        self.create_mult_sym_table()
+        self.create_conj_move_table()
+        self.create_twist_conj_table()
+        self.create_ud_edges_conj_table()
+        self.create_flipslice_tables()
+        self.create_corner_tables()
+
+    def create_mult_sym_table(self):
+        """Generate the group table for the 48 cube symmetries"""
+        mult_sym = np.zeros((k.N_SYM, k.N_SYM), dtype=np.uint8)
+        for i in range(k.N_SYM):
+            for j in range(k.N_SYM):
+                cc = CubieCube(symCube[i].corners.copy(), symCube[i].edges.copy())
+                cc.multiply(symCube[j])
+                for k_sym in range(k.N_SYM):
+                    if cc == symCube[k_sym]:  # SymCube[i]*SymCube[j] == SymCube[k]
+                        mult_sym[i, j] = k_sym
+                        break
+        return mult_sym
+
+    def create_conj_move_table(self):
+        """Generate the table for the conjugation of a move m by a symmetry s. conj_move[N_MOVE*s + m] = s*m*s^-1"""
+        conj_move = np.zeros((k.N_SYM, k.N_MOVE), dtype=np.uint16)
+        for s in range(k.N_SYM):
+            for m in Color:
+                ss = CubieCube(
+                    symCube[s].corners.copy(), symCube[s].edges.copy()
+                )  # copy cube
+                ss.multiply(BasicMoves[m])  # s*m
+                ss.multiply(symCube[inv_idx[s]])  # s*m*s^-1
+                for m2 in Color:
+                    if ss == BasicMoves[m2]:
+                        conj_move[s, m] = m2
+        return conj_move
+
+    def create_twist_conj_table(self):
+        """Generate the phase 1 table for the conjugation of the twist t by a symmetry s. twist_conj[t, s] = s*t*s^-1"""
+        fname = "conj_twist.npy"
+        fpath = os.path.join(self.folder, fname)
+        if not path.isfile(fpath):
+            if self.show_progress:
+                self.console.print(
+                    "All tables are stored in " + path.dirname(path.abspath(fpath))
+                )
+                self.console.print()
+                self.console.print(f"[bold blue]Creating {fname} table...[/bold blue]")
+            twist_conj = np.zeros((k.N_TWIST, k.N_SYM_D4h), dtype=np.uint16)
+            for t in range(k.N_TWIST):
+                cc = CubieCube()
+                cc.set_twist(t)
+                for s in range(k.N_SYM_D4h):
+                    ss = CubieCube(
+                        symCube[s].corners.copy(), symCube[s].edges.copy()
+                    )  # copy cube
+                    ss.corner_multiply(cc)  # s*t
+                    ss.corner_multiply(symCube[inv_idx[s]])  # s*t*s^-1
+                    twist_conj[t, s] = ss.get_twist()
+            np.save(fpath, twist_conj)
+        else:
+            if self.show_progress:
+                self.console.print(f"[bold green]Loading {fname} table...[/bold green]")
+            # mmap_mode='r' allows for instant loading (memory mapping)
+            # See: https://numpy.org/devdocs/reference/generated/numpy.memmap.html
+            twist_conj = np.load(fpath, mmap_mode="r")
+        return twist_conj
+
+    def create_ud_edges_conj_table(self):
+        """Generate the phase 2 table for the conjugation of the URtoDB coordinate by a symmetrie"""
+        fname = "conj_ud_edges.npy"
+        fpath = os.path.join(self.folder, fname)
+        if not path.isfile(fpath):
+            if self.show_progress:
+                self.console.print(f"[bold blue]Creating {fname} table...[/bold blue]")
+            ud_edges_conj = np.zeros((k.N_UD_EDGES, k.N_SYM_D4h), dtype=np.uint16)
+
+            iterator = range(k.N_UD_EDGES)
+            if self.show_progress:
+                iterator = track(
+                    iterator,
+                    description=f"Generating {fname}...".ljust(
+                        k.PROGRESS_BAR_DESC_WIDTH
+                    ),
+                )
+
+            for t in iterator:
+                cc = CubieCube()
+                cc.set_ud_edges(t)
+                for s in range(k.N_SYM_D4h):
+                    ss = CubieCube(
+                        symCube[s].corners.copy(), symCube[s].edges.copy()
+                    )  # copy cube
+                    ss.edge_multiply(cc)  # s*t
+                    ss.edge_multiply(symCube[inv_idx[s]])  # s*t*s^-1
+                    ud_edges_conj[t, s] = ss.get_ud_edges()
+            np.save(fpath, ud_edges_conj)
+        else:
+            if self.show_progress:
+                self.console.print(f"[bold green]Loading {fname} table...[/bold green]")
+            ud_edges_conj = np.load(fpath, mmap_mode="r")
+        return ud_edges_conj
+
+    def create_flipslice_tables(self):
+        """Generate the tables to handle the symmetry reduced flip-slice coordinate in  phase 1"""
+        fname1 = "fs_classidx.npy"
+        fname2 = "fs_sym.npy"
+        fname3 = "fs_rep.npy"
+        fpath1 = path.join(self.folder, fname1)
+        fpath2 = path.join(self.folder, fname2)
+        fpath3 = path.join(self.folder, fname3)
+
+        if not (path.isfile(fpath1) and path.isfile(fpath2) and path.isfile(fpath3)):
+            if self.show_progress:
+                self.console.print(
+                    "[bold blue]Creating flipslice sym-tables...[/bold blue]"
+                )
+            flipslice_classidx = np.full(
+                k.N_FLIP * k.N_SLICE, 65535, dtype=np.uint16
+            )  # idx -> classidx
+            flipslice_sym = np.zeros(
+                k.N_FLIP * k.N_SLICE, dtype=np.uint8
+            )  # idx -> symmetry
+            flipslice_rep = np.zeros(
+                k.N_FLIPSLICE_CLASS, dtype=np.uint32
+            )  # classidx -> idx of representant
+
+            classidx = 0
+            cc = CubieCube()
+
+            iterator = range(k.N_SLICE)
+            if self.show_progress:
+                iterator = track(
+                    iterator,
+                    description="Generating flipslice sym-tables...".ljust(
+                        k.PROGRESS_BAR_DESC_WIDTH
+                    ),
+                )
+
+            for slc in iterator:
+                cc.set_slice(slc)
+                for flip in range(k.N_FLIP):
+                    cc.set_flip(flip)
+                    idx = k.N_FLIP * slc + flip
+
+                    if flipslice_classidx[idx] == 65535:
+                        flipslice_classidx[idx] = classidx
+                        flipslice_sym[idx] = 0
+                        flipslice_rep[classidx] = idx
+                    else:
+                        continue
+                    for s in range(
+                        k.N_SYM_D4h
+                    ):  # conjugate representant by all 16 symmetries
+                        ss = CubieCube(
+                            symCube[inv_idx[s]].corners.copy(),
+                            symCube[inv_idx[s]].edges.copy(),
+                        )  # copy cube
+                        ss.edge_multiply(cc)
+                        ss.edge_multiply(symCube[s])  # s^-1*cc*s
+                        idx_new = k.N_FLIP * ss.get_slice() + ss.get_flip()
+                        if flipslice_classidx[idx_new] == 65535:
+                            flipslice_classidx[idx_new] = classidx
+                            flipslice_sym[idx_new] = s
+                    classidx += 1
+            np.save(fpath1, flipslice_classidx)
+            np.save(fpath2, flipslice_sym)
+            np.save(fpath3, flipslice_rep)
+            return flipslice_classidx, flipslice_sym, flipslice_rep
+
+        else:
+            if self.show_progress:
+                self.console.print(
+                    "[bold green]Loading flipslice sym-tables...[/bold green]"
+                )
+            flipslice_classidx = np.load(fpath1, mmap_mode="r")
+            flipslice_sym = np.load(fpath2, mmap_mode="r")
+            flipslice_rep = np.load(fpath3, mmap_mode="r")
+            return flipslice_classidx, flipslice_sym, flipslice_rep
+
+    def create_corner_tables(self):
+        """Generate the tables to handle the symmetry reduced corner permutation coordinate in phase 2"""
+        fname1 = "co_classidx.npy"
+        fname2 = "co_sym.npy"
+        fname3 = "co_rep.npy"
+        fpath1 = path.join(self.folder, fname1)
+        fpath2 = path.join(self.folder, fname2)
+        fpath3 = path.join(self.folder, fname3)
+
+        if not (path.isfile(fpath1) and path.isfile(fpath2) and path.isfile(fpath3)):
+            if self.show_progress:
+                self.console.print(
+                    "[bold blue]Creating corner sym-tables...[/bold blue]"
+                )
+            corner_classidx = np.full(
+                k.N_CORNERS, 65535, dtype=np.uint16
+            )  # idx -> classidx
+            corner_sym = np.zeros(k.N_CORNERS, dtype=np.uint8)  # idx -> symmetry
+            corner_rep = np.zeros(
+                k.N_CORNERS_CLASS, dtype=np.uint16
+            )  # classidx -> idx of representant
+
+            classidx = 0
+            cc = CubieCube()
+
+            iterator = range(k.N_CORNERS)
+            if self.show_progress:
+                iterator = track(
+                    iterator,
+                    description="Generating corner sym-tables...".ljust(
+                        k.PROGRESS_BAR_DESC_WIDTH
+                    ),
+                )
+
+            for cp in iterator:
+                cc.set_corners(cp)
+
+                if corner_classidx[cp] == 65535:
+                    corner_classidx[cp] = classidx
+                    corner_sym[cp] = 0
+                    corner_rep[classidx] = cp
+                else:
+                    continue
+                for s in range(
+                    k.N_SYM_D4h
+                ):  # conjugate representant by all 16 symmetries
+                    ss = CubieCube(
+                        symCube[inv_idx[s]].corners.copy(),
+                        symCube[inv_idx[s]].edges.copy(),
+                    )  # copy cube
+                    ss.corner_multiply(cc)
+                    ss.corner_multiply(symCube[s])  # s^-1*cc*s
+                    cp_new = ss.get_corners()
+                    if corner_classidx[cp_new] == 65535:
+                        corner_classidx[cp_new] = classidx
+                        corner_sym[cp_new] = s
+                classidx += 1
+            np.save(fpath1, corner_classidx)
+            np.save(fpath2, corner_sym)
+            np.save(fpath3, corner_rep)
+            return corner_classidx, corner_sym, corner_rep
+
+        else:
+            if self.show_progress:
+                self.console.print(
+                    "[bold green]Loading corner sym-tables...[/bold green]"
+                )
+            corner_classidx = np.load(fpath1, mmap_mode="r")
+            corner_sym = np.load(fpath2, mmap_mode="r")
+            corner_rep = np.load(fpath3, mmap_mode="r")
+            return corner_classidx, corner_sym, corner_rep
