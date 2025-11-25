@@ -29,11 +29,12 @@ from os import path
 
 import numpy as np
 from lehmer import Lehmer
+from rich.console import Console
 from rich.progress import track
-from rich.self.console import Console
 
 from rubik.cube import Cube
-from rubik.defs import Constants as k
+
+from .defs import Constants as k
 
 
 class Color(IntEnum):
@@ -1061,7 +1062,7 @@ class Symmetries:
     def __init__(self, folder: str = k.FOLDER, show_progress: bool = True):
         self.folder = folder
         self.show_progress = show_progress
-        self.self.console = Console()  # use for pretty printing and progress bars
+        self.console = Console()  # use for pretty printing and progress bars
 
         if not os.path.exists(self.folder):
             os.mkdir(self.folder)
@@ -1107,12 +1108,6 @@ class Symmetries:
         fname = "conj_twist.npy"
         fpath = os.path.join(self.folder, fname)
         if not path.isfile(fpath):
-            if self.show_progress:
-                self.console.print(
-                    "All tables are stored in " + path.dirname(path.abspath(fpath))
-                )
-                self.console.print()
-                self.console.print(f"[bold blue]Creating {fname} table...[/bold blue]")
             twist_conj = np.zeros((k.N_TWIST, k.N_SYM_D4h), dtype=np.uint16)
             for t in range(k.N_TWIST):
                 cc = CubieCube()
@@ -1138,8 +1133,8 @@ class Symmetries:
         fname = "conj_ud_edges.npy"
         fpath = os.path.join(self.folder, fname)
         if not path.isfile(fpath):
-            if self.show_progress:
-                self.console.print(f"[bold blue]Creating {fname} table...[/bold blue]")
+            # if self.show_progress:
+            # self.console.print(f"[bold blue]Creating {fname} table...[/bold blue]")
             ud_edges_conj = np.zeros((k.N_UD_EDGES, k.N_SYM_D4h), dtype=np.uint16)
 
             iterator = range(k.N_UD_EDGES)
@@ -1178,10 +1173,10 @@ class Symmetries:
         fpath3 = path.join(self.folder, fname3)
 
         if not (path.isfile(fpath1) and path.isfile(fpath2) and path.isfile(fpath3)):
-            if self.show_progress:
-                self.console.print(
-                    "[bold blue]Creating flipslice sym-tables...[/bold blue]"
-                )
+            # if self.show_progress:
+            # self.console.print(
+            # "[bold blue]Creating flipslice sym-tables...[/bold blue]"
+            # )
             flipslice_classidx = np.full(
                 k.N_FLIP * k.N_SLICE, 65535, dtype=np.uint16
             )  # idx -> classidx
@@ -1255,10 +1250,10 @@ class Symmetries:
         fpath3 = path.join(self.folder, fname3)
 
         if not (path.isfile(fpath1) and path.isfile(fpath2) and path.isfile(fpath3)):
-            if self.show_progress:
-                self.console.print(
-                    "[bold blue]Creating corner sym-tables...[/bold blue]"
-                )
+            # if self.show_progress:
+            # self.console.print(
+            # "[bold blue]Creating corner sym-tables...[/bold blue]"
+            # )
             corner_classidx = np.full(
                 k.N_CORNERS, 65535, dtype=np.uint16
             )  # idx -> classidx
