@@ -3,6 +3,7 @@ import time
 
 from rich.console import Console
 
+from .coord import Coord
 from .cubie import Symmetries
 from .moves import Moves
 from .pruning import Pruning
@@ -38,6 +39,9 @@ def main():
 
         pruning = Pruning(folder=args.path, show_progress=args.show_progress)
         pruning.create_tables()
+
+        coord = Coord(folder=args.path, show_progress=args.show_progress)
+        coord.create_tables()
 
         end_time = time.time()
         duration = end_time - start_time

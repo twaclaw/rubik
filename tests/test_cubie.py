@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 from rubik.cube import Cube
-from rubik.cubie_cube import BasicMoves, Color, CubieCube
+from rubik.kociemba.cubie import BasicMoves, Color, CubieCube
+from rubik.kociemba.defs import Constants as k
 
 
 class TestCubie:
@@ -122,21 +123,25 @@ class TestCubie:
             cube.set_ud_edges(i)
             assert i == cube.get_ud_edges()
 
-    def test_aux_functions(self):
-        cube = CubieCube()
-        N = 20
-        a = np.random.randint(0, N, N)
-        a0 = a.copy()
-
-        for right in range(N):
-            for left in range(right, N):
-                cube.rotate_right(a, right, left)
-                cube.rotate_left(a, right, left)
-                assert np.array_equal(a0, a)
-
     def test_corners(self):
         cube = CubieCube()
         for i in range(40320):
             cube.set_corners(i)
             c = cube.get_corners()
             assert i == c
+
+
+class TestSymmetries:
+    def test_symmetry_count(self):
+        cube = CubieCube()
+        syms = cube.symmetries()
+        assert len(syms) == 2 * k.N_SYM
+        assert sorted(syms) == list(range(2 * k.N_SYM))
+
+    def test_symmetries_scrambled_cube(self):
+        c = Cube(initial="random", number_of_scramble_moves=3)
+        cc = CubieCube()
+        cc.from_cube(c)
+        syms = cc.symmetries()
+        assert isinstance(syms, list)
+        assert len(syms) <= 2 * k.N_SYM

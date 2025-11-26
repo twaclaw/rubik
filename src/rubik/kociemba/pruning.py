@@ -156,8 +156,8 @@ class Pruning:
             flipslice_rep = self.flipslice_rep
 
             while done < total:
-                if self.show_progress:
-                    self.console.print(f"Depth: {depth}, Done: {done}/{total}")
+                # if self.show_progress:
+                    # self.console.print(f"Depth: {depth}, Done: {done}/{total}")
 
                 depth3 = depth % 3
                 next_depth = (depth + 1) % 3
@@ -185,7 +185,7 @@ class Pruning:
                 if self.show_progress:
                     iterator = track(
                         iterator,
-                        description=f"Depth {depth} ({'Back' if backsearch else 'Fwd'})".ljust(
+                        description=f"Depth {depth} done: {done}/{total} [{'Back' if backsearch else 'Fwd'}]".ljust(
                             k.PROGRESS_BAR_DESC_WIDTH
                         ),
                     )
@@ -332,8 +332,8 @@ class Pruning:
                 "[bold yellow]Generating phase 2 pruning table. This may take some time...[/bold yellow]"
             )
             while depth < 10:  # we fill the table only do depth 9 + 1
-                if self.show_progress:
-                    self.console.print(f"Depth: {depth}, Done: {done}/{total}")
+                # if self.show_progress:
+                    # self.console.print(f"Depth: {depth}, Done: {done}/{total}")
 
                 depth3 = depth % 3
                 idx = 0
@@ -342,7 +342,7 @@ class Pruning:
                 if self.show_progress:
                     iterator = track(
                         iterator,
-                        description=f"Depth {depth}".ljust(k.PROGRESS_BAR_DESC_WIDTH),
+                        description=f"Depth {depth} done: {done}/{total}".ljust(k.PROGRESS_BAR_DESC_WIDTH),
                     )
 
                 for c_classidx in iterator:
@@ -430,8 +430,6 @@ class Pruning:
 
                 depth += 1
 
-            if self.show_progress:
-                self.console.print("Remaining unfilled entries have depth >=11")
             np.save(fpath, self.corners_ud_edges_depth3)
         else:
             if self.show_progress:
@@ -459,11 +457,18 @@ class Pruning:
 
             phase2_moves = [0, 1, 2, 4, 7, 9, 10, 11, 13, 16]
 
-            while done < k.N_CORNERS * k.N_PERM_4:
-                if self.show_progress:
-                    self.console.print(
-                        f"Depth: {depth}, Done: {done}/{k.N_CORNERS * k.N_PERM_4}"
-                    )
+            iterator = range(13)
+            if self.show_progress:
+                iterator = track(
+                    iterator,
+                    description=f"Generating {fname}...".ljust(
+                        k.PROGRESS_BAR_DESC_WIDTH
+                    ),
+                )
+
+            for depth in iterator:
+                if done >= k.N_CORNERS * k.N_PERM_4:
+                    break
 
                 indices = np.flatnonzero(self.cornslice_depth == depth)
                 if indices.size == 0:
@@ -484,7 +489,6 @@ class Pruning:
                         self.cornslice_depth[idx1[mask]] = depth + 1
                         done += np.count_nonzero(mask)
 
-                depth += 1
             np.save(fpath, self.cornslice_depth)
         else:
             if self.show_progress:
