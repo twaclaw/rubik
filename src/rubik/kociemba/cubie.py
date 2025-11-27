@@ -1089,13 +1089,28 @@ class Symmetries:
         if not os.path.exists(self.folder):
             os.mkdir(self.folder)
 
+        self.mult_sym = None
+        self.conj_move = None
+        self.twist_conj = None
+        self.ud_edges_conj = None
+        self.flipslice_classidx = None
+        self.flipslice_sym = None
+        self.flipslice_rep = None
+        self.corner_classidx = None
+        self.corner_sym = None
+        self.corner_rep = None
+
     def create_tables(self):
-        self.create_mult_sym_table()
-        self.create_conj_move_table()
-        self.create_twist_conj_table()
-        self.create_ud_edges_conj_table()
-        self.create_flipslice_tables()
-        self.create_corner_tables()
+        self.mult_sym = self.create_mult_sym_table()
+        self.conj_move = self.create_conj_move_table()
+        self.twist_conj = self.create_twist_conj_table()
+        self.ud_edges_conj = self.create_ud_edges_conj_table()
+        self.flipslice_classidx, self.flipslice_sym, self.flipslice_rep = (
+            self.create_flipslice_tables()
+        )
+        self.corner_classidx, self.corner_sym, self.corner_rep = (
+            self.create_corner_tables()
+        )
 
     def create_mult_sym_table(self):
         """Generate the group table for the 48 cube symmetries"""
@@ -1113,16 +1128,35 @@ class Symmetries:
     def create_conj_move_table(self):
         """Generate the table for the conjugation of a move m by a symmetry s. conj_move[N_MOVE*s + m] = s*m*s^-1"""
         conj_move = np.zeros((k.N_SYM, k.N_MOVE), dtype=np.uint16)
+
+        # Create CubieCubes for all 18 moves
+        moves_cubies = []
+        for m in Move:
+            # Determine face and power
+            # U1=0, U2=1, U3=2 -> Face U, powers 1, 2, 3
+            face_idx = m // 3
+            power = (m % 3) + 1
+
+            face_color = Color(face_idx)
+            basic_move = BasicMoves[face_color]
+
+            cc = CubieCube()  # Identity
+            for _ in range(power):
+                cc.multiply(basic_move)
+            moves_cubies.append(cc)
+
         for s in range(k.N_SYM):
-            for m in Color:
+            for m in Move:
                 ss = CubieCube(
                     symCube[s].corners.copy(), symCube[s].edges.copy()
                 )  # copy cube
-                ss.multiply(BasicMoves[m])  # s*m
+                ss.multiply(moves_cubies[m])  # s*m
                 ss.multiply(symCube[inv_idx[s]])  # s*m*s^-1
-                for m2 in Color:
-                    if ss == BasicMoves[m2]:
+
+                for m2 in Move:
+                    if ss == moves_cubies[m2]:
                         conj_move[s, m] = m2
+                        break
         return conj_move
 
     def create_twist_conj_table(self):

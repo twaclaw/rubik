@@ -195,20 +195,20 @@ class CoordCube:
         Update phase 1 coordinates when move is applied.
         :param m: The move
         """
-        self.twist = self.moves.twist_move[k.N_MOVE * self.twist + m]
-        self.flip = self.moves.flip_move[k.N_MOVE * self.flip + m]
+        self.twist = self.moves.twist_move[k.N_MOVE * int(self.twist) + m]
+        self.flip = self.moves.flip_move[k.N_MOVE * int(self.flip) + m]
         self.slice_sorted = self.moves.slice_sorted_move[
-            k.N_MOVE * self.slice_sorted + m
+            k.N_MOVE * int(self.slice_sorted) + m
         ]
         # optional:
         self.u_edges = self.moves.u_edges_move[
-            k.N_MOVE * self.u_edges + m
+            k.N_MOVE * int(self.u_edges) + m
         ]  # u_edges and d_edges retrieve ud_edges easily
         self.d_edges = self.moves.d_edges_move[
-            k.N_MOVE * self.d_edges + m
+            k.N_MOVE * int(self.d_edges) + m
         ]  # if phase 1 is finished and phase 2 starts
         self.corners = self.moves.corners_move[
-            k.N_MOVE * self.corners + m
+            k.N_MOVE * int(self.corners) + m
         ]  # Is needed only in phase 2
 
         self.flipslice_classidx = self.symmetries.flipslice_classidx[
@@ -231,10 +231,10 @@ class CoordCube:
         :param m: The move
         """
         self.slice_sorted = self.moves.slice_sorted_move[
-            k.N_MOVE * self.slice_sorted + m
+            k.N_MOVE * int(self.slice_sorted) + m
         ]
-        self.corners = self.moves.corners_move[k.N_MOVE * self.corners + m]
-        self.ud_edges = self.moves.ud_edges_move[k.N_MOVE * self.ud_edges + m]
+        self.corners = self.moves.corners_move[k.N_MOVE * int(self.corners) + m]
+        self.ud_edges = self.moves.ud_edges_move[k.N_MOVE * int(self.ud_edges) + m]
 
     def get_depth_phase1(self):
         """
@@ -248,29 +248,31 @@ class CoordCube:
         classidx = self.symmetries.flipslice_classidx[flipslice]
         sym = self.symmetries.flipslice_sym[flipslice]
         depth_mod3 = self.pruning.get_flipslice_twist_depth3(
-            k.N_TWIST * classidx + self.symmetries.twist_conj[(twist << 4) + sym]
+            k.N_TWIST * int(classidx) + int(self.symmetries.twist_conj[twist, sym])
         )
 
         depth = 0
         while flip != self.SOLVED or slice_ != self.SOLVED or twist != self.SOLVED:
+            if depth > 25: # TODO: check if this is required
+                break
             if depth_mod3 == 0:
                 depth_mod3 = 3
             for m in Move:
-                twist1 = self.moves.twist_move[k.N_MOVE * twist + m]
-                flip1 = self.moves.flip_move[k.N_MOVE * flip + m]
+                twist1 = self.moves.twist_move[k.N_MOVE * int(twist) + m]
+                flip1 = self.moves.flip_move[k.N_MOVE * int(flip) + m]
                 slice1 = (
                     self.moves.slice_sorted_move[
-                        k.N_MOVE * slice_ * k.N_PERM_4 + m
+                        k.N_MOVE * int(slice_) * k.N_PERM_4 + m
                     ]
                     // k.N_PERM_4
                 )
-                flipslice1 = k.N_FLIP * slice1 + flip1
+                flipslice1 = k.N_FLIP * int(slice1) + int(flip1)
                 classidx1 = self.symmetries.flipslice_classidx[flipslice1]
                 sym = self.symmetries.flipslice_sym[flipslice1]
                 if (
                     self.pruning.get_flipslice_twist_depth3(
-                        k.N_TWIST * classidx1
-                        + self.symmetries.twist_conj[(twist1 << 4) + sym]
+                        k.N_TWIST * int(classidx1)
+                        + int(self.symmetries.twist_conj[twist1, sym])
                     )
                     == depth_mod3 - 1
                 ):
@@ -280,6 +282,8 @@ class CoordCube:
                     slice_ = slice1
                     depth_mod3 -= 1
                     break
+            else:
+                return 12 # TODO: check if this is really required
         return depth
 
     def get_depth_phase2(self, corners, ud_edges):
@@ -293,13 +297,15 @@ class CoordCube:
         classidx = self.symmetries.corner_classidx[corners]
         sym = self.symmetries.corner_sym[corners]
         depth_mod3 = self.pruning.get_corners_ud_edges_depth3(
-            k.N_UD_EDGES * classidx
-            + self.symmetries.ud_edges_conj[(ud_edges << 4) + sym]
+            k.N_UD_EDGES * int(classidx)
+            + int(self.symmetries.ud_edges_conj[ud_edges, sym])
         )
         if depth_mod3 == 3:  # unfilled entry, depth >= 11
             return 11
         depth = 0
         while corners != self.SOLVED or ud_edges != self.SOLVED:
+            if depth > 20:
+                break
             if depth_mod3 == 0:
                 depth_mod3 = 3
             # only iterate phase 2 moves
@@ -315,14 +321,14 @@ class CoordCube:
                 Move.L2,
                 Move.B2,
             ):
-                corners1 = self.moves.corners_move[k.N_MOVE * corners + m]
-                ud_edges1 = self.moves.ud_edges_move[k.N_MOVE * ud_edges + m]
+                corners1 = self.moves.corners_move[k.N_MOVE * int(corners) + m]
+                ud_edges1 = self.moves.ud_edges_move[k.N_MOVE * int(ud_edges) + m]
                 classidx1 = self.symmetries.corner_classidx[corners1]
                 sym = self.symmetries.corner_sym[corners1]
                 if (
                     self.pruning.get_corners_ud_edges_depth3(
-                        k.N_UD_EDGES * classidx1
-                        + self.symmetries.ud_edges_conj[(ud_edges1 << 4) + sym]
+                        k.N_UD_EDGES * int(classidx1)
+                        + int(self.symmetries.ud_edges_conj[ud_edges1, sym])
                     )
                     == depth_mod3 - 1
                 ):
@@ -331,4 +337,6 @@ class CoordCube:
                     ud_edges = ud_edges1
                     depth_mod3 -= 1
                     break
+            else:
+                break
         return depth

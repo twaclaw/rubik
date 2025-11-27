@@ -175,6 +175,7 @@ class Pruning:
                     indices = np.flatnonzero(prun_table == depth3)
 
                 if indices.size == 0:
+                    print(f"Depth {depth}: No more indices to expand. Done: {done}/{total}")
                     break
 
                 # Process in batches to avoid memory overflow
@@ -209,7 +210,7 @@ class Pruning:
                         flip1 = flip_move[18 * flip + m]
                         slice1 = slice_sorted_move[432 * slice_ + m] // 24
 
-                        flipslice1 = (slice1 << 11) + flip1
+                        flipslice1 = (slice1.astype(np.int64) << 11) + flip1.astype(np.int64)
 
                         fs1_classidx = flipslice_classidx[flipslice1]
                         fs1_sym_val = flipslice_sym[flipslice1]

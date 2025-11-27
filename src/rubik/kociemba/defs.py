@@ -17,6 +17,6 @@ class Constants:
     N_UD_EDGES: int = 40320  # 8! permutations of the edges in the U-face and D-face in phase 2
     N_SYM: int = 48  # number of cube symmetries of full group Oh
     N_SYM_D4h: int = 16  # Number of symmetries of subgroup D4h
-    FOLDER: str = "twophase"  # Folder name for generated tables
+    FOLDER: str = "tables"  # Folder name for generated tables
     PROGRESS_BAR_DESC_WIDTH: int = 42  # Width of the description in the progress bar
 
