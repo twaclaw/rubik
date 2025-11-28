@@ -7,8 +7,9 @@ import numpy as np
 from rich.console import Console
 from rich.progress import track
 
-from .cubie import CubieCube, Move, Symmetries
+from .cubie import CubieCube
 from .cubie import Edge as Ed
+from .cubie import Move, Symmetries
 from .defs import Constants as k
 from .moves import Moves
 from .pruning import Pruning
@@ -103,7 +104,9 @@ class CoordCube:
     def __init__(self, cc: CubieCube = None):
         """
         Create cube on coordinate level from Id-cube of from CubieCube
-        :param cc: The CubieCube
+
+        Args:
+        - cc: CubieCube The CubieCube
         """
         if cc is None:
             self.twist = self.SOLVED  # twist of corners

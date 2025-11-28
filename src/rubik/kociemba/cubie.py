@@ -66,6 +66,23 @@ class Move(IntEnum):
     B2 = 16
     B3 = 17
 
+    def to_htm(self) -> str:
+        """Convert move to HTM (Half Turn Metric) notation."""
+        if self.name.endswith("1"):
+            return self.name[0]
+        elif self.name.endswith("2"):
+            return self.name[0]*2
+        elif self.name.endswith("3"):
+            return self.name[0].lower()
+
+    def to_manim_str(self) -> str:
+        """Convert move to Manim string notation."""
+        if self.name.endswith("1"):
+            return self.name[0]
+        elif self.name.endswith("2"):
+            return self.name[0] + "2"
+        elif self.name.endswith("3"):
+            return self.name[0] + "'"
 
 
 # Map the corner positions to facelet colors.

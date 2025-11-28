@@ -1,103 +1,62 @@
 """The SolverThread class solves implements the two phase algorithm"""
-import threading as thr
+
 import time
-from typing import List
+from dataclasses import dataclass
 
 from rich.console import Console
 
 from .coord import Coord, CoordCube
-from .cubie import CubieCube, Move, Symmetries, symCube
+from .cubie import CubieCube, Move, Symmetries
 from .defs import Constants as k
 from .moves import Moves
 from .pruning import Pruning
 
 
-class SolverThread(thr.Thread):
-    def __init__(
-        self,
-        cb_cube: CubieCube,
-        rot: int,
-        inv: int,
-        ret_length: int,
-        timeout: float,
-        start_time: float,
-        solutions: List[List[Move]],
-        terminated: thr.Event,
-        shortest_length: List[int],
-        moves: Moves,
-        pruning: Pruning,
-        symmetries: Symmetries,
-        coord: Coord,
-    ):
-        """
-        :param cb_cube: The cube to be solved in CubieCube representation
-        :param rot: Rotates the  cube 120° * rot along the long diagonal before applying the two-phase-algorithm
-        :param inv: 0: Do not invert the cube . 1: Invert the cube before applying the two-phase-algorithm
-        :param ret_length: If a solution with length <= ret_length is found the search stops.
-         The most efficient way to solve a cube is to start six threads in parallel with rot = 0, 1 and 2 and
-         inv = 0, 1. The first thread which finds a solutions sets the terminated flag which signals all other threads
-         to teminate. On average this solves a cube about 12 times faster than solving one cube with a single thread.
-         And this despite of Pythons GlobalInterpreterLock GIL.
-        :param timeout: Essentially the maximal search time in seconds. Essentially because the search does not return
-         before at least one solution has been found.
-        :param start_time: The time the search started.
-        :param solutions: An array with the found solutions found by the six parallel threads
-        :param terminated: An event shared by the six threads to signal a termination request
-        :param shortest_length: The length of the shortes solutions in the solution array
-        """
-        thr.Thread.__init__(self)
-        self.cb_cube = cb_cube  # CubieCube
-        self.co_cube = None  # CoordCube initialized in function run
-        self.rot = rot
-        self.inv = inv
-        self.sofar_phase1 = None
-        self.sofar_phase2 = None
-        self.phase2_done = False
-        self.lock = thr.Lock()
-        self.ret_length = ret_length
-        self.timeout = timeout
-        self.start_time = start_time
+@dataclass
+class SolverResult:
+    ph1_str: str
+    ph2_str: str
+    ph1_htm: str
+    ph2_htm: str
+    execution_time: float
 
-        self.cornersave = 0
+class Solver:
+    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True):
+        self.folder = folder
+        self.show_progress = show_progress
+        self.console = Console()
+        self.solution_ph1: str | None = None
+        self.solution_ph2: str | None = None
 
-        # these variables are shared by the six threads, initialized in function solve
-        self.solutions = solutions
-        self.terminated = terminated
-        self.shortest_length = shortest_length
+        # Initialize tables
+        self.symmetries = Symmetries(folder=folder, show_progress=show_progress)
+        self.moves = Moves(folder=folder, show_progress=show_progress)
+        self.pruning = Pruning(folder=folder, show_progress=show_progress)
+        self.coord = Coord(folder=folder, show_progress=show_progress)
 
-        # Dependencies
-        self.moves = moves
-        self.pruning = pruning
-        self.symmetries = symmetries
-        self.coord = coord
+        # Load tables
+        self.symmetries.create_tables()
+        self.moves.create_tables()
+        self.pruning.create_tables()
+        self.coord.create_tables()
+
+        # Inject dependencies into CoordCube
+        CoordCube.moves = self.moves
+        CoordCube.pruning = self.pruning
+        CoordCube.symmetries = self.symmetries
+        CoordCube.coord = self.coord
+
+
+        # Internal cube
+        self.cb_cube = CubieCube()
 
     def search_phase2(self, corners, ud_edges, slice_sorted, dist, togo_phase2):
-        # ##############################################################################################################
-        if self.terminated.is_set() or self.phase2_done:
+        if self.phase2_done:
             return
-        ################################################################################################################
+
         if togo_phase2 == 0 and slice_sorted == 0:
-            self.lock.acquire()  # phase 2 solved, store solution
-            man = self.sofar_phase1 + self.sofar_phase2
-            if len(self.solutions) == 0 or (len(self.solutions[-1]) > len(man)):
-
-                if self.inv == 1:  # we solved the inverse cube
-                    man = list(reversed(man))
-                    man[:] = [
-                        Move((m // 3) * 3 + (2 - m % 3)) for m in man
-                    ]  # R1->R3, R2->R2, R3->R1 etc.
-                man[:] = [
-                    Move(self.symmetries.conj_move[16 * self.rot, m])
-                    for m in man
-                ]
-                self.solutions.append(man)
-                self.shortest_length[0] = len(man)
-
-            if (
-                self.shortest_length[0] <= self.ret_length
-            ):  # we have reached the target length
-                self.terminated.set()
-            self.lock.release()
+            self.solution_ph1 = self.sofar_phase1.copy()
+            self.solution_ph2 = self.sofar_phase2.copy()
             self.phase2_done = True
         else:
             for m in Move:
@@ -160,19 +119,9 @@ class SolverThread(thr.Thread):
                 self.sofar_phase2.pop(-1)
 
     def search(self, flip, twist, slice_sorted, dist, togo_phase1):
-        # ##############################################################################################################
-        if self.terminated.is_set():
-            return
-        ################################################################################################################
         if togo_phase1 == 0:  # phase 1 solved
             if flip != 0 or twist != 0 or slice_sorted // 24 != 0:
                 return
-
-            if (
-                time.monotonic() > self.start_time + self.timeout
-                and len(self.solutions) > 0
-            ):
-                self.terminated.set()
 
             # compute initial phase 2 coordinates
             if self.sofar_phase1:  # check if list is not empty
@@ -196,7 +145,7 @@ class SolverThread(thr.Thread):
                 self.cornersave = corners
 
             # new solution must be shorter and we do not use phase 2 maneuvers with length > 11 - 1 = 10
-            togo2_limit = min(self.shortest_length[0] - len(self.sofar_phase1), 11)
+            togo2_limit = 11 # min(self.shortest_length[0] - len(self.sofar_phase1), 11)
             if (
                 self.pruning.cornslice_depth[24 * int(corners) + int(slice_sorted)] >= togo2_limit
             ):  # precheck speeds up the computation
@@ -275,32 +224,17 @@ class SolverThread(thr.Thread):
                 self.search(
                     flip_new, twist_new, slice_sorted_new, dist_new, togo_phase1 - 1
                 )
+                if self.phase2_done:
+                    return
                 self.sofar_phase1.pop(-1)
 
-    def run(self):
-        cb = None
-        if self.rot == 0:  # no rotation
-            cb = CubieCube(
-                self.cb_cube.corners.copy(), self.cb_cube.edges.copy()
-            )  # Copy constructor might be different
-        elif self.rot == 1:  # conjugation by 120° rotation
-            cb = CubieCube(
-                symCube[32].corners.copy(), symCube[32].edges.copy()
-            )
-            cb.multiply(self.cb_cube)
-            cb.multiply(symCube[16])
-        elif self.rot == 2:  # conjugation by 240° rotation
-            cb = CubieCube(
-                symCube[16].corners.copy(), symCube[16].edges.copy()
-            )
-            cb.multiply(self.cb_cube)
-            cb.multiply(symCube[32])
-        if self.inv == 1:  # invert cube
-            tmp = cb.inverse()
-            cb = tmp
-
+    def solve(self, cube_string: str) -> SolverResult:
+        """Solve the cube given in cube_string using the two phase algorithm"""
+        t0 = time.perf_counter()
+        self.cb_cube.from_string(cube_string)
+        self.phase2_done = False
         self.co_cube = CoordCube(
-            cb
+            self.cb_cube
         )  # the rotated/inverted cube in coordinate representation
 
         dist = self.co_cube.get_depth_phase1()
@@ -315,85 +249,18 @@ class SolverThread(thr.Thread):
                 dist,
                 togo1,
             )
+            if self.phase2_done:
+                break
+        t = time.perf_counter() - t0
 
-
-class Solver:
-    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True):
-        self.folder = folder
-        self.show_progress = show_progress
-        self.console = Console()
-
-        # Initialize tables
-        self.symmetries = Symmetries(folder=folder, show_progress=show_progress)
-        self.moves = Moves(folder=folder, show_progress=show_progress)
-        self.pruning = Pruning(folder=folder, show_progress=show_progress)
-        self.coord = Coord(folder=folder, show_progress=show_progress)
-
-        # Load tables
-        self.symmetries.create_tables()
-        self.moves.create_tables()
-        self.pruning.create_tables()
-        self.coord.create_tables()
-
-        # Inject dependencies into CoordCube
-        CoordCube.moves = self.moves
-        CoordCube.pruning = self.pruning
-        CoordCube.symmetries = self.symmetries
-        CoordCube.coord = self.coord
-
-    def solve(self, cubestring: str, max_length: int = 20, timeout: float = 3) -> str:
-        """Solve a cube defined by its cube definition string.
-        :param cubestring: The format of the string is given in the Facelet class defined in the file enums.py
-        :param max_length: The function will return if a maneuver of length <= max_length has been found
-        :param timeout: If the function times out, the best solution found so far is returned. If there has not been found
-        any solution yet the computation continues until a first solution appears.
-        """
-        cc = CubieCube()
-        cc.from_string(cubestring)
-
-        my_threads = []
-        s_time = time.monotonic()
-
-        # these mutable variables are modidified by all six threads
-        solutions = []
-        terminated = thr.Event()
-        terminated.clear()
-        syms = cc.symmetries()
-        if (
-            len(list({16, 20, 24, 28} & set(syms))) > 0
-        ):  # we have some rotational symmetry along a long diagonal
-            tr = [0, 3]  # so we search only one direction and the inverse
-        else:
-            tr = range(6)  # This means search in 3 directions + inverse cube
-        if (
-            len(list(set(range(48, 96)) & set(syms))) > 0
-        ):  # we have some antisymmetry so we do not search the inverses
-            tr = list(filter(lambda x: x < 3, tr))
-        for i in tr:
-            th = SolverThread(
-                cc,
-                i % 3,
-                i // 3,
-                max_length,
-                timeout,
-                s_time,
-                solutions,
-                terminated,
-                [999],
-                self.moves,
-                self.pruning,
-                self.symmetries,
-                self.coord,
-            )
-            my_threads.append(th)
-            th.start()
-        for t in my_threads:
-            t.join()  # wait until all threads have finished
-        s = ""
-        if len(solutions) > 0:
-            for m in solutions[-1]:  # the last solution is the shortest
-                s += m.name + " "
-        return s + "(" + str(len(s) // 3) + "f)"
-
-
-
+        ph1_htm = "".join([Move.to_htm(m) for m in self.solution_ph1])
+        ph2_htm = "".join([Move.to_htm(m) for m in self.solution_ph2])
+        ph1_str = " ".join([Move.to_manim_str(m) for m in self.solution_ph1])
+        ph2_str = " ".join([Move.to_manim_str(m) for m in self.solution_ph2])
+        return SolverResult(
+            ph1_str=ph1_str,
+            ph2_str=ph2_str,
+            ph1_htm=ph1_htm,
+            ph2_htm=ph2_htm,
+            execution_time=t,
+        )
