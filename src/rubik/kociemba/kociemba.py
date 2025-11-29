@@ -50,8 +50,11 @@ def create_video(args, moves_ph1, moves_ph2):
 
     with tempconfig(manim_config):
         with suppress_stdout_stderr():
-            scene = RubiksCubeAnimation(moves_ph1=moves_ph1, moves_ph2=moves_ph2, initial_state=args.cube_string)
+            scene = RubiksCubeAnimation(
+                moves_ph1=moves_ph1, moves_ph2=moves_ph2, initial_state=args.cube_string
+            )
             scene.render()
+
 
 def create_tables(args):
     start_time = time.time()
@@ -89,7 +92,7 @@ def call_solver(args):
 
     r = solver.solve(args.cube_string)
     console.rule("[bold] Results")
-    console.print("Algorithm: Kociemba Two-Phase")
+    console.print("Algorithm: Kociemba's Two-Phase")
     console.print(f"Cube String: [bold yellow]{args.cube_string}[/bold yellow]")
     console.print(
         f"Solution HTM: [bold cyan]{r.ph1_htm}[/bold cyan][bold magenta]{r.ph2_htm}[/bold magenta]"
@@ -113,7 +116,6 @@ def call_solver(args):
         console.print("[bold green]Video generated as video.mp4[/bold green]")
 
 
-
 def main():
     parser = argparse.ArgumentParser(description="Kociemba Algorithm")
     parser.add_argument("--verbose", action="store_true", help="Show progress")
@@ -132,9 +134,10 @@ def main():
         "--path", required=False, help="Path to the tables", default="./tables"
     )
     solver_parser.add_argument(
-        "--cube-string", required=False, help="String representation of the cube"
+        "-c", "--cube-string", required=False, help="String representation of the cube"
     )
     solver_parser.add_argument(
+        "-n",
         "--num-scrambles",
         type=int,
         required=False,

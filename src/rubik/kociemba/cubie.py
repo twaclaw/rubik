@@ -683,7 +683,7 @@ class CubieCube:
                 face, row, col = target_facelets[j]
                 faces[face, row, col] = colors[j]
 
-        cube = Cube(initial=faces, size=3)
+        cube = Cube(faces=faces, size=3)
         return cube
 
     def to_string(self) -> str:
@@ -713,7 +713,7 @@ class CubieCube:
                     faces[face, row, col] = char_colors[cube_string[idx]]
                     idx += 1
 
-        cube = Cube(initial=faces, size=3)
+        cube = Cube(faces=faces, size=3)
         self.from_cube(cube)
 
 

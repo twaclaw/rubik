@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from rubik.cube import Cube, Move
+from rubik.cube import Cube, Face, Move
 
 
 class TestCube:
@@ -116,3 +116,29 @@ class TestCube:
                 cube.move(move)
                 cube.move(move.inverse())
                 assert (cube.faces == c0).all()
+
+    def test_from_string(self):
+        for size in [2, 3]:
+            cube_string = ""
+            for f in Face:
+                cube_string += f.name * (size * size)
+
+            cube = Cube(size=size, initial=cube_string)
+            cube2 = cube.copy()
+            assert cube.is_solution()
+            assert cube2.is_solution()
+
+            cube = Cube(size=size, initial=cube_string[10:] + cube_string[:10])
+            assert not cube.is_solution()
+            cube2 = cube.copy()
+            assert not cube2.is_solution()
+
+    def test_string_conversion(self):
+        for size in [2, 3]:
+            cube = Cube(initial="random", size=size)
+            cube_string = cube.to_string()
+            cube2 = Cube(size=size, initial=cube_string)
+            assert (cube.faces == cube2.faces).all()
+
+            cube3 = Cube(size=size, faces=cube.faces.copy())
+            assert (cube.faces == cube3.faces).all()

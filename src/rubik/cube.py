@@ -8,6 +8,7 @@ from rich.console import Console, Group
 from rich.table import Table
 from rich.text import Text
 
+N_STATES_CUBE_2 = 3674160  # 7! * 3^6
 
 class Face(IntEnum):
     U = 0  # Up
@@ -208,7 +209,8 @@ class Cube:
     def __init__(
         self,
         size: int = 3,
-        initial: np.ndarray | Literal["random", "solved"] = "random",
+        initial: Literal["random", "solved"] | str = "solved",
+        faces: np.ndarray | None = None,
         number_of_scramble_moves: int = 10,
     ):
         self.size = size
@@ -228,20 +230,59 @@ class Cube:
             allowed_moves += [m.inverse() for m in allowed_moves]
             self.possible_moves = np.array(allowed_moves)
 
+        self.faces = np.arange(6, dtype=np.uint8)[:, np.newaxis, np.newaxis]
+        self.faces = np.broadcast_to(self.faces, (6, size, size)).copy()
+        self._solved = self.faces.copy()
 
+        if faces is not None:
+            if faces.shape != (6, size, size):
+                raise ValueError(
+                    f"Faces shape {faces.shape} does not match expected shape {(6, size, size)}."
+                )
+            self.faces = faces.copy()
+        elif initial != "solved" and initial != "random":
+            """
+            Faces in the order: U, R, F, D, L, B,
+            for instance: "UUUUUUUURURRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB"
+            """
+            if len(initial) != 6 * size * size:
+                raise ValueError(
+                    f"Cube string length {len(initial)} does not match expected length {6 * size * size} for size {size}."
+                )
+            for face in range(6):
+                for row in range(size):
+                    for col in range(size):
+                        index = face * size * size + row * size + col
+                        char = initial[index]
+                        self.faces[face, row, col] = Face[char].value
+        elif initial == "random":
+            initial_seq = []
+            for _ in range(number_of_scramble_moves):
+                move = np.random.choice(self.basic_moves)
+                self.move(move)
+                initial_seq.append(Move(move).name)
 
-        if isinstance(initial, np.ndarray):
-            self.faces = initial.copy()
-        elif isinstance(initial, str) and (initial == "random" or initial == "solved"):
-            self.faces = np.arange(6, dtype=np.uint8)[:, np.newaxis, np.newaxis]
-            self.faces = np.broadcast_to(self.faces, (6, size, size)).copy()
-            self._solved = self.faces.copy()
-            if initial == "random":
-                initial_seq = []
-                for _ in range(number_of_scramble_moves):
-                    move = np.random.choice(self.basic_moves)
-                    self.move(move)
-                    initial_seq.append(Move(move).name)
+    def copy(self) -> "Cube":
+        return Cube(size=self.size, faces=self.faces.copy())
+
+    @classmethod
+    def from_string(cls, cube_string: str) -> "Cube":
+        size = int(len(cube_string) / 6) ** 0.5
+        if size != int(size):
+            raise ValueError(
+                f"Cube string length {len(cube_string)} is not valid for any cube size."
+            )
+        size = int(size)
+        return cls(size=size, initial=cube_string)
+
+    def to_string(self) -> str:
+        cube_string = ""
+        for face in range(6):
+            for row in range(self.size):
+                for col in range(self.size):
+                    face_value = self.faces[face, row, col]
+                    cube_string += Face(face_value).name
+        return cube_string
 
     def _get_slice(self, slice_type: SliceType):
         if slice_type == SliceType.TOP_ROW:
