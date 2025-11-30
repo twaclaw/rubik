@@ -1,8 +1,14 @@
 from collections import deque
 
 import numpy as np
+from rich.progress import Progress
 
-from .cube import Cube, Move
+from .cube import N_STATES_CUBE_2, N_STATES_CUBE_3, Cube, Move
+
+INFO: dict[str, str] = {
+    "algorithm": "Met-in-the-middle: Bidirectional Breadth-First Search (Bi-BFS)",
+}
+
 
 
 def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
@@ -12,11 +18,6 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
     A more general way would be to have a function that expands one the frontier and call this
     function from a terminate function that evaluates when to stop the search.
     """
-    if cube.size > 2:
-        raise NotImplementedError(
-            "Are you nuts, BFS, in Python, for a cube larger than 2x2x2?"
-        )
-
     if cube.is_solution():
         return [], 0
 
@@ -31,59 +32,71 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
     visited_back: dict[bytes, np.ndarray] = {}
     visited_back[solved_cube.hashable()] = np.array([], dtype=np.uint8)
 
-    while queue_front or queue_back:
-        states_processed += 1
-        state_front, seq_front = queue_front.popleft()
-        state_back, seq_back = queue_back.popleft()
+    N_STATES = N_STATES_CUBE_2 if cube.size == 2 else N_STATES_CUBE_3
 
-        cube.decompress(state_front)
-        solved_cube.decompress(state_back)
+    with Progress() as progress:
+        task = progress.add_task("Solving...", total=N_STATES)
 
-        # Forward search
-        for move_val in cube.possible_moves:
-            move = Move(move_val)
-            cube.move(move)
+        while queue_front or queue_back:
+            states_processed += 1
+            state_front, seq_front = queue_front.popleft()
+            state_back, seq_back = queue_back.popleft()
 
-            if cube.is_solution():
-                return cube.solution_path(np.append(seq_front, [move])), len(
-                    visited_front
+            if states_processed % 1000 == 0:
+                progress.update(
+                    task,
+                    completed=len(visited_front) + len(visited_back),
+                    description=f"States: {len(visited_front) + len(visited_back):,}/{N_STATES:,} (Queue: {len(queue_front) + len(queue_back):,})",
                 )
 
-            hash_value = cube.hashable()
+            cube.decompress(state_front)
+            solved_cube.decompress(state_back)
 
-            new_seq = np.append(seq_front.copy(), [move.value])
+            # Forward search
+            for move_val in cube.possible_moves:
+                move = Move(move_val)
+                cube.move(move)
 
-            if hash_value in visited_back:
-                seq_back_sol = cube.reverse_sequence(visited_back[hash_value])
-                return cube.solution_path(np.append(new_seq, seq_back_sol)), len(
-                    visited_front
-                ) + len(visited_back)
+                if cube.is_solution():
+                    return cube.solution_path(np.append(seq_front, [move])), len(
+                        visited_front
+                    )
 
-            if hash_value not in visited_front:
-                visited_front[hash_value] = new_seq
-                queue_front.append((cube.compress(), new_seq))
+                hash_value = cube.hashable()
 
-            cube.move(move.inverse())  # Undo the move
+                new_seq = np.append(seq_front.copy(), [move.value])
 
-        # Backward search
-        for move_val in solved_cube.possible_moves:
-            move = Move(move_val)
-            solved_cube.move(move)
+                if hash_value in visited_back:
+                    seq_back_sol = cube.reverse_sequence(visited_back[hash_value])
+                    return cube.solution_path(np.append(new_seq, seq_back_sol)), len(
+                        visited_front
+                    ) + len(visited_back)
 
-            hash_value = solved_cube.hashable()
+                if hash_value not in visited_front:
+                    visited_front[hash_value] = new_seq
+                    queue_front.append((cube.compress(), new_seq))
 
-            new_seq = np.append(seq_back.copy(), [move.value])
+                cube.move(move.inverse())  # Undo the move
 
-            if hash_value in visited_front:
-                seq_front_sol = visited_front[hash_value]
-                return cube.solution_path(
-                    np.append(seq_front_sol, cube.reverse_sequence(new_seq))
-                ), len(visited_front) + len(visited_back)
+            # Backward search
+            for move_val in solved_cube.possible_moves:
+                move = Move(move_val)
+                solved_cube.move(move)
 
-            if hash_value not in visited_back:
-                visited_back[hash_value] = new_seq
-                queue_back.append((solved_cube.compress(), new_seq))
+                hash_value = solved_cube.hashable()
 
-            solved_cube.move(move.inverse())  # Undo the move
+                new_seq = np.append(seq_back.copy(), [move.value])
+
+                if hash_value in visited_front:
+                    seq_front_sol = visited_front[hash_value]
+                    return cube.solution_path(
+                        np.append(seq_front_sol, cube.reverse_sequence(new_seq))
+                    ), len(visited_front) + len(visited_back)
+
+                if hash_value not in visited_back:
+                    visited_back[hash_value] = new_seq
+                    queue_back.append((solved_cube.compress(), new_seq))
+
+                solved_cube.move(move.inverse())  # Undo the move
 
     return None, len(visited_front)

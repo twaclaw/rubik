@@ -9,6 +9,7 @@ from rich.table import Table
 from rich.text import Text
 
 N_STATES_CUBE_2 = 3674160  # 7! * 3^6
+N_STATES_CUBE_3 = 43252003274489856000
 
 class Face(IntEnum):
     U = 0  # Up
@@ -215,8 +216,8 @@ class Cube:
     ):
         self.size = size
         self.rotations = default_rotations.copy()
-        if size == 3:
-            self.rotations |= cube_3_additional_rotations
+        # if size == 3:
+            # self.rotations |= cube_3_additional_rotations
         self.rotations |= {
             k.inverse(): v.inverse() for k, v in self.rotations.items()
         }

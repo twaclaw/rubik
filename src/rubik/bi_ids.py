@@ -5,13 +5,19 @@ Bi-directional Iterative Deepening Search (IDS)
 from collections import deque
 
 import numpy as np
+from rich.progress import Progress, TaskID
 
-from .cube import Cube, Move
+from .cube import N_STATES_CUBE_2, N_STATES_CUBE_3, Cube, Move
+
+INFO: dict[str, str] = {
+    "algorithm": "Bidirectional Iterative Deepening Depth First Search (Bi-IDDFS)",
+}
 
 
-def bi_ids(cube: Cube, max_depth: int) -> list[str]:
+
+def bi_ids(cube: Cube, max_depth: int = 20) -> tuple[list[str] | None, int]:
     if cube.size > 3:
-        raise NotImplementedError("Not implemented for cubes larger than 2x2")
+        raise NotImplementedError("Not implemented for cubes larger than 3x3")
 
     if cube.is_solution():
         return [], 0
@@ -20,12 +26,19 @@ def bi_ids(cube: Cube, max_depth: int) -> list[str]:
     visited_back: dict[bytes, np.ndarray] = {}
 
     c0 = cube.faces.copy()
+    total_visited = 0
 
-    for depth in range(max_depth + 1):
-        cube.faces = c0.copy()
-        solution_path, nvisited = dfs(cube, depth, visited_front, visited_back)
-        if solution_path is not None:
-            return solution_path, nvisited
+    with Progress() as progress:
+        task = progress.add_task("Solving...", total=N_STATES_CUBE_2 if cube.size == 2 else N_STATES_CUBE_3)
+
+        for depth in range(max_depth + 1):
+            cube.faces = c0.copy()
+            solution_path, nvisited = dfs(
+                cube, depth, visited_front, visited_back, progress, task
+            )
+            total_visited += nvisited
+            if solution_path is not None:
+                return solution_path, total_visited
 
     return None, len(visited_front) + len(visited_back)
 
@@ -35,6 +48,8 @@ def dfs(
     max_depth: int,
     visited_front: dict[bytes, np.ndarray],
     visited_back: dict[bytes, np.ndarray],
+    progress: Progress,
+    task: TaskID,
 ) -> tuple[list[str] | None, int]:
 
     cube_solved = Cube(size=cube.size, initial="solved")
@@ -42,10 +57,21 @@ def dfs(
     queue_front = deque([(cube.compress(), np.array([], dtype=np.uint8))])
     queue_back = deque([(cube_solved.compress(), np.array([], dtype=np.uint8))])
 
-    print(f"DFS at depth {max_depth}, front visited: {len(visited_front)}, back visited: {len(visited_back)}")
+    # print(f"DFS at depth {max_depth}, front visited: {len(visited_front)}, back visited: {len(visited_back)}")
+    i = 0
+    last_update = 0
     while queue_front:
         current_state, move_seq = queue_front.pop()
         cube.decompress(current_state)  # updates cube.faces
+
+        i += 1
+        if i - last_update >= 1000:
+            progress.update(
+                task,
+                advance=(i - last_update),
+                description=f"Depth: {max_depth} (Queue: {len(queue_front) + len(queue_back)})",
+            )
+            last_update = i
 
         if len(move_seq) < max_depth:
             for move_val in cube.possible_moves:
@@ -55,12 +81,16 @@ def dfs(
                 new_move_seq = np.append(move_seq.copy(), [move.value])
 
                 if cube.is_solution():
-                    return [Move(x).name for x in new_move_seq], len(visited_front) + len(visited_back)
+                    progress.update(task, advance=(i - last_update))
+                    return [Move(x).name for x in new_move_seq], len(
+                        visited_front
+                    ) + len(visited_back)
 
                 hash_value = cube.hashable()
 
                 if hash_value in visited_back:
                     seq_back_sol = cube.reverse_sequence(visited_back[hash_value])
+                    progress.update(task, advance=(i - last_update))
                     return cube.solution_path(
                         np.append(new_move_seq, seq_back_sol)
                     ), len(visited_front) + len(visited_back)
@@ -76,6 +106,15 @@ def dfs(
         current_state, move_seq = queue_back.pop()
         cube_solved.decompress(current_state)  # updates cube.faces
 
+        i += 1
+        if i - last_update >= 1000:
+            progress.update(
+                task,
+                advance=(i - last_update),
+                description=f"Depth: {max_depth} (Queue: {len(queue_front) + len(queue_back)})",
+            )
+            last_update = i
+
         if len(move_seq) < max_depth:
             for move_val in cube_solved.possible_moves:
                 move = Move(move_val)
@@ -87,6 +126,7 @@ def dfs(
 
                 if hash_value in visited_front:
                     seq_front_sol = visited_front[hash_value]
+                    progress.update(task, advance=(i - last_update))
                     return cube_solved.solution_path(
                         np.append(
                             seq_front_sol, cube_solved.reverse_sequence(new_move_seq)
@@ -100,4 +140,5 @@ def dfs(
 
                 cube_solved.move(move.inverse())  # Undo the move
 
+    progress.update(task, advance=(i - last_update))
     return None, 0

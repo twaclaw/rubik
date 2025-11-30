@@ -5,7 +5,9 @@ from rich.progress import Progress
 
 from .cube import N_STATES_CUBE_2, Cube, Move
 
-ALGORITHM = "Breadth-First Search (BFS)"
+INFO: dict[str, str] = {
+    "algorithm": "Breadth-First Search (BFS)",
+}
 
 def bfs(cube: Cube) -> tuple[list[str] | None, int]:
     if cube.size != 2:
