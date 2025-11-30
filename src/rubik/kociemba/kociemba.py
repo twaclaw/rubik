@@ -12,7 +12,7 @@ from .solver import Solver
 console = Console()
 
 
-def create_video(args, moves_ph1, moves_ph2):
+def create_video(args, moves_ph1, moves_ph2, format:str = "mp4"):
     import os
     import sys
     from contextlib import contextmanager
@@ -30,10 +30,13 @@ def create_video(args, moves_ph1, moves_ph2):
         "preview": False,
         "write_to_movie": True,
         "save_last_frame": False,
-        "output_file": "video.mp4",
+        "output_file": f"video.{format}",
         "verbosity": "CRITICAL",
         "progress_bar": "none",
     }
+
+    if format == "gif":
+        manim_config["format"] = "gif"
 
     @contextmanager
     def suppress_stdout_stderr():
@@ -114,6 +117,11 @@ def call_solver(args):
         console.rule("[bold] Generating Video")
         create_video(args, r.ph1_str.split(), r.ph2_str.split())
         console.print("[bold green]Video generated as video.mp4[/bold green]")
+
+    if args.gif:
+        console.rule("[bold] Generating GIF")
+        create_video(args, r.ph1_str.split(), r.ph2_str.split(), format="gif")
+        console.print("[bold green]GIF generated as video.gif[/bold green]")
 
 
 def main():

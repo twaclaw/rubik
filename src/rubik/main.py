@@ -52,7 +52,7 @@ def run_solver(cube: Cube, algorithm: str):
     console.print(f"Cube String: [bold cyan]{cube_string}[/bold cyan]")
     solution_str = "".join(solution) if solution is not None else "No solution found"
     console.print(f"Solution: [bold cyan]{solution_str}[/bold cyan]")
-    console.print(f"Solved in [bold]{t:.2f} s[/bold].")
+    console.print(f"Elapsed time: [bold]{t:.2f} s[/bold].")
     console.rule("[bold] Original Cube")
     cube0.plot_cube()
     if solution is not None:
@@ -101,12 +101,13 @@ def main():
     )
 
     if args.size > 2:
+        console.rule("[bold] Warnings")
         console.print(
-            "[bold red]Warning: Solving cubes larger than 2x2 may be very slow or even intractable![/bold red]"
+            "[bold]Solving cubes larger than 2x2 may be very slow or even intractable![/bold]"
         )
         if args.size == 3:
             console.print(
-                "[bold yellow]Use the kociemba command line tool for faster solving of 3x3 cubes[/bold yellow]"
+                "[bold]Use the [yellow]kociemba[/yellow] command line tool for faster solving of 3x3 cubes[/bold]"
             )
 
     run_solver(cube, args.algorithm)
