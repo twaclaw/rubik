@@ -7,20 +7,22 @@ from collections import deque
 import numpy as np
 from rich.progress import Progress, TaskID
 
-from .cube import N_STATES_CUBE_2, N_STATES_CUBE_3, Cube, Move
+from .cube import Cube, Move, Results
 
 INFO: dict[str, str] = {
     "algorithm": "Bidirectional Iterative Deepening Depth First Search (Bi-IDDFS)",
 }
 
 
-
-def bi_ids(cube: Cube, max_depth: int = 20) -> tuple[list[str] | None, int]:
+def bi_ids(cube: Cube, max_depth: int | None = None) -> Results:
     if cube.size > 3:
         raise NotImplementedError("Not implemented for cubes larger than 3x3")
 
+    if max_depth is None:
+        max_depth = 14 if cube.size == 2 else 20
+
     if cube.is_solution():
-        return [], 0
+        return Results()
 
     visited_front: dict[bytes, np.ndarray] = {}
     visited_back: dict[bytes, np.ndarray] = {}
@@ -29,18 +31,20 @@ def bi_ids(cube: Cube, max_depth: int = 20) -> tuple[list[str] | None, int]:
     total_visited = 0
 
     with Progress() as progress:
-        task = progress.add_task("Solving...", total=N_STATES_CUBE_2 if cube.size == 2 else N_STATES_CUBE_3)
+        task = progress.add_task("Solving...", total=None)
 
         for depth in range(max_depth + 1):
             cube.faces = c0.copy()
-            solution_path, nvisited = dfs(
+            results = dfs(
                 cube, depth, visited_front, visited_back, progress, task
             )
-            total_visited += nvisited
-            if solution_path is not None:
-                return solution_path, total_visited
+            total_visited += results.nvisited
 
-    return None, len(visited_front) + len(visited_back)
+            if results.solution_path:
+                results.nvisited = total_visited
+                return results
+
+    return Results(nvisited=total_visited)
 
 
 def dfs(
@@ -50,7 +54,7 @@ def dfs(
     visited_back: dict[bytes, np.ndarray],
     progress: Progress,
     task: TaskID,
-) -> tuple[list[str] | None, int]:
+) -> Results:
 
     cube_solved = Cube(size=cube.size, initial="solved")
 
@@ -82,18 +86,29 @@ def dfs(
 
                 if cube.is_solution():
                     progress.update(task, advance=(i - last_update))
-                    return [Move(x).name for x in new_move_seq], len(
-                        visited_front
-                    ) + len(visited_back)
+                    front = [Move(x).name for x in new_move_seq]
+                    n_visited = len(visited_front) + len(visited_back)
+                    return Results(solution_path=front, nvisited=n_visited)
 
                 hash_value = cube.hashable()
 
                 if hash_value in visited_back:
                     seq_back_sol = cube.reverse_sequence(visited_back[hash_value])
                     progress.update(task, advance=(i - last_update))
-                    return cube.solution_path(
+
+                    forward_path = [Move(x).name for x in new_move_seq]
+                    backward_path = [Move(x).name for x in visited_back[hash_value]]
+                    solution_path = cube.solution_path(
                         np.append(new_move_seq, seq_back_sol)
-                    ), len(visited_front) + len(visited_back)
+                    )
+                    n_visited = len(visited_front) + len(visited_back)
+
+                    return Results(
+                        forward_path=forward_path,
+                        backward_path=backward_path,
+                        solution_path=solution_path,
+                        nvisited=n_visited,
+                    )
 
                 if hash_value not in visited_front:
                     visited_front[hash_value] = new_move_seq
@@ -127,11 +142,22 @@ def dfs(
                 if hash_value in visited_front:
                     seq_front_sol = visited_front[hash_value]
                     progress.update(task, advance=(i - last_update))
-                    return cube_solved.solution_path(
+
+                    forward_path = [Move(x).name for x in seq_front_sol]
+                    backward_path = [Move(x).name for x in new_move_seq]
+                    solution_path = cube_solved.solution_path(
                         np.append(
                             seq_front_sol, cube_solved.reverse_sequence(new_move_seq)
                         )
-                    ), len(visited_front) + len(visited_back)
+                    )
+                    n_visited = len(visited_front) + len(visited_back)
+
+                    return Results(
+                        forward_path=forward_path,
+                        backward_path=backward_path,
+                        solution_path=solution_path,
+                        nvisited=n_visited,
+                    )
 
                 if hash_value not in visited_back:
                     visited_back[hash_value] = new_move_seq
@@ -141,4 +167,4 @@ def dfs(
                 cube_solved.move(move.inverse())  # Undo the move
 
     progress.update(task, advance=(i - last_update))
-    return None, 0
+    return Results(nvisited=i)

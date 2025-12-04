@@ -3,15 +3,14 @@ from collections import deque
 import numpy as np
 from rich.progress import Progress
 
-from .cube import N_STATES_CUBE_2, N_STATES_CUBE_3, Cube, Move
+from .cube import Cube, Move, Results
 
 INFO: dict[str, str] = {
     "algorithm": "Met-in-the-middle: Bidirectional Breadth-First Search (Bi-BFS)",
 }
 
 
-
-def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
+def bi_bfs(cube: Cube) -> Results:
     """
     Bidirectional BFS. Meet in the middle.
     This is just a possible way of implemented bidirectional BFS. This one doesn't guarantee that the shortest path is found.
@@ -19,7 +18,7 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
     function from a terminate function that evaluates when to stop the search.
     """
     if cube.is_solution():
-        return [], 0
+        return Results()
 
     solved_cube = Cube(size=cube.size, initial="solved")
 
@@ -32,10 +31,8 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
     visited_back: dict[bytes, np.ndarray] = {}
     visited_back[solved_cube.hashable()] = np.array([], dtype=np.uint8)
 
-    N_STATES = N_STATES_CUBE_2 if cube.size == 2 else N_STATES_CUBE_3
-
     with Progress() as progress:
-        task = progress.add_task("Solving...", total=N_STATES)
+        task = progress.add_task("Solving...", total=None)
 
         while queue_front or queue_back:
             states_processed += 1
@@ -46,7 +43,7 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
                 progress.update(
                     task,
                     completed=len(visited_front) + len(visited_back),
-                    description=f"States: {len(visited_front) + len(visited_back):,}/{N_STATES:,} (Queue: {len(queue_front) + len(queue_back):,})",
+                    description=f"States: {len(visited_front) + len(visited_back):,} (Queue: {len(queue_front) + len(queue_back):,})",
                 )
 
             cube.decompress(state_front)
@@ -58,9 +55,8 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
                 cube.move(move)
 
                 if cube.is_solution():
-                    return cube.solution_path(np.append(seq_front, [move])), len(
-                        visited_front
-                    )
+                    solution_path = cube.solution_path(np.append(seq_front, [move]))
+                    return Results(solution_path=solution_path, nvisited=len(visited_front))
 
                 hash_value = cube.hashable()
 
@@ -68,9 +64,18 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
                 if hash_value in visited_back:
                     seq_back_sol = cube.reverse_sequence(visited_back[hash_value])
-                    return cube.solution_path(np.append(new_seq, seq_back_sol)), len(
-                        visited_front
-                    ) + len(visited_back)
+
+                    forward_path = [Move(x).name for x in new_seq]
+                    backward_path = [Move(x).name for x in visited_back[hash_value]]
+                    solution_path = cube.solution_path(np.append(new_seq, seq_back_sol))
+                    n_visited = len(visited_front) + len(visited_back)
+
+                    return Results(
+                        forward_path=forward_path,
+                        backward_path=backward_path,
+                        solution_path=solution_path,
+                        nvisited=n_visited,
+                    )
 
                 if hash_value not in visited_front:
                     visited_front[hash_value] = new_seq
@@ -89,9 +94,20 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
                 if hash_value in visited_front:
                     seq_front_sol = visited_front[hash_value]
-                    return cube.solution_path(
+
+                    forward_path = [Move(x).name for x in seq_front_sol]
+                    backward_path = [Move(x).name for x in new_seq]
+                    solution_path = cube.solution_path(
                         np.append(seq_front_sol, cube.reverse_sequence(new_seq))
-                    ), len(visited_front) + len(visited_back)
+                    )
+                    n_visited = len(visited_front) + len(visited_back)
+
+                    return Results(
+                        forward_path=forward_path,
+                        backward_path=backward_path,
+                        solution_path=solution_path,
+                        nvisited=n_visited,
+                    )
 
                 if hash_value not in visited_back:
                     visited_back[hash_value] = new_seq
@@ -99,4 +115,4 @@ def bi_bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
                 solved_cube.move(move.inverse())  # Undo the move
 
-    return None, len(visited_front)
+    return Results(nvisited=len(visited_front))

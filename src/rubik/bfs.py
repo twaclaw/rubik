@@ -3,20 +3,20 @@ from collections import deque
 import numpy as np
 from rich.progress import Progress
 
-from .cube import N_STATES_CUBE_2, Cube, Move
+from .cube import Cube, Move, Results
 
 INFO: dict[str, str] = {
     "algorithm": "Breadth-First Search (BFS)",
 }
 
-def bfs(cube: Cube) -> tuple[list[str] | None, int]:
-    if cube.size != 2:
-        raise NotImplementedError(
-            "Are you nuts, BFS, in Python, for a cube larger than 2x2?"
-        )
+def bfs(cube: Cube) -> Results:
+    # if cube.size != 2:
+    #     raise NotImplementedError(
+    #         "Are you nuts, BFS, in Python, for a cube larger than 2x2?"
+    #     )
 
     if cube.is_solution():
-        return [], 0
+        return Results()
 
     queue = deque([(cube.compress(), np.array([], dtype=np.uint8))])  # (compressed_state, move_sequence)
 
@@ -27,7 +27,7 @@ def bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
 
     with Progress() as progress:
-        task = progress.add_task("Solving...", total=N_STATES_CUBE_2)
+        task = progress.add_task("Solving...", total=None)
 
         while queue:
             i += 1
@@ -37,7 +37,7 @@ def bfs(cube: Cube) -> tuple[list[str] | None, int]:
                 progress.update(
                     task,
                     completed=len(visited),
-                    description=f"States: {len(visited):,}/{N_STATES_CUBE_2:,} (Queue: {len(queue):,})",
+                    description=f"States: {len(visited):,} (Queue: {len(queue):,})",
                 )
 
             cube.decompress(current_state)  # updates cube.faces
@@ -48,7 +48,7 @@ def bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
                 new_move_seq = np.append(move_seq.copy(), [move.value])
                 if cube.is_solution():
-                    return [Move(x).name for x in new_move_seq], i
+                    return Results(solution_path=[Move(x).name for x in new_move_seq], nvisited=i)
 
                 hash_value = cube.hashable()
                 if hash_value not in visited:
@@ -57,5 +57,5 @@ def bfs(cube: Cube) -> tuple[list[str] | None, int]:
 
                 cube.move(move.inverse())  # Undo the move
 
-    return None, len(visited)
+    return Results(nvisited=len(visited))
 

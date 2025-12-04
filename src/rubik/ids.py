@@ -7,38 +7,39 @@ from collections import deque
 import numpy as np
 from rich.progress import Progress, TaskID
 
-from .cube import N_STATES_CUBE_2, N_STATES_CUBE_3, Cube, Move
+from .cube import Cube, Move, Results
 
 INFO: dict[str, str] = {
     "algorithm": "Iterative Deepening Depth First Search (IDDFS)",
 }
 
 
-def ids(cube: Cube, max_depth: int = 20) -> tuple[list[str] | None, int]:
-    if cube.size > 2:
-        raise NotImplementedError("Not implemented for cubes larger than 2x2")
+def ids(cube: Cube, max_depth: int = 14) -> Results:
+    # if cube.size > 2:
+    #     raise NotImplementedError("Not implemented for cubes larger than 2x2")
 
     if cube.is_solution():
-        return [], 0
+        return Results()
 
     c0 = cube.faces.copy()
     total_visited = 0
 
     with Progress() as progress:
-        task = progress.add_task("Solving...", total=N_STATES_CUBE_2 if cube.size == 2 else N_STATES_CUBE_3)
+        task = progress.add_task("Solving...", total=None)
 
         for depth in range(max_depth + 1):
             cube.faces = c0.copy()
-            solution_path, visited = dfs(cube, depth, progress, task)
-            total_visited += visited
-            if solution_path is not None:
-                return solution_path, total_visited
+            results = dfs(cube, depth, progress, task)
+            total_visited += results.nvisited
+            if results.solution_path:
+                results.nvisited = total_visited
+                return results
 
-    return None, total_visited
+    return Results(nvisited=total_visited)
 
 def dfs(
     cube: Cube, max_depth: int, progress: Progress, task: TaskID
-) -> tuple[list[str] | None, int]:
+) -> Results:
     queue = deque([(cube.compress(), np.array([], dtype=np.uint8))])
 
     i = 0
@@ -65,11 +66,11 @@ def dfs(
 
                 if cube.is_solution():
                     progress.update(task, advance=(i - last_update))
-                    return [Move(x).name for x in new_move_seq], i
+                    return Results(solution_path=[Move(x).name for x in new_move_seq], nvisited=i)
 
                 queue.append((cube.compress(), new_move_seq))
 
                 cube.move(move.inverse())  # Undo the move
 
     progress.update(task, advance=(i - last_update))
-    return None, i
+    return Results(nvisited=i)

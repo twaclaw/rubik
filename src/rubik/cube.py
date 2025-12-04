@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Literal
 
@@ -8,8 +8,18 @@ from rich.console import Console, Group
 from rich.table import Table
 from rich.text import Text
 
-N_STATES_CUBE_2 = 3674160  # 7! * 3^6
-N_STATES_CUBE_3 = 43252003274489856000
+
+@dataclass
+class Results:
+    """
+    Data class to hold results from the solving algorithms.
+    """
+
+    forward_path: list[str] | None = field(default_factory=list)
+    backward_path: list[str] | None = field(default_factory=list)
+    solution_path: list[str] | None = field(default_factory=list)
+    nvisited: int = 0
+
 
 class Face(IntEnum):
     U = 0  # Up
@@ -200,7 +210,7 @@ cube_3_additional_rotations: dict[Move, Rotation] = {
             CycleElement(Face.U, SliceType.MIDDLE_ROW, False, True),
             CycleElement(Face.R, SliceType.MIDDLE_ROW, True, False),
             CycleElement(Face.D, SliceType.MIDDLE_ROW, False, True),
-        ]
+        ],
     ),
     # To be implemented if needed
 }
@@ -217,10 +227,8 @@ class Cube:
         self.size = size
         self.rotations = default_rotations.copy()
         # if size == 3:
-            # self.rotations |= cube_3_additional_rotations
-        self.rotations |= {
-            k.inverse(): v.inverse() for k, v in self.rotations.items()
-        }
+        # self.rotations |= cube_3_additional_rotations
+        self.rotations |= {k.inverse(): v.inverse() for k, v in self.rotations.items()}
         self.possible_moves = np.array(list(self.rotations.keys()))
         self.basic_moves = np.array(list(default_rotations.keys()))
 
@@ -404,7 +412,9 @@ class Cube:
 
         return table
 
-    def plot_face_with_labels(self, face_index: int, print_table: bool = False) -> Table:
+    def plot_face_with_labels(
+        self, face_index: int, print_table: bool = False
+    ) -> Table:
         table = Table(show_header=False, show_edge=True, expand=False, padding=(0, 0))
 
         for _ in range(self.size):
@@ -441,7 +451,14 @@ class Cube:
         return Text("\n".join(invisible_lines), style="")
 
     def _plot_invisible_face_with_labels(self) -> Table:
-        table = Table(show_header=False, show_edge=True, show_lines=True, expand=False, padding=(0, 0), style="black")
+        table = Table(
+            show_header=False,
+            show_edge=True,
+            show_lines=True,
+            expand=False,
+            padding=(0, 0),
+            style="black",
+        )
 
         for _ in range(self.size):
             table.add_column(justify="center", width=4)
@@ -463,7 +480,11 @@ class Cube:
         left_table = face_plotter(Face.L)
         right_table = face_plotter(Face.R)
 
-        invisible = self._plot_invisible_face_with_labels() if plot_with_labels else self._plot_invisible_face()
+        invisible = (
+            self._plot_invisible_face_with_labels()
+            if plot_with_labels
+            else self._plot_invisible_face()
+        )
 
         top_row = Columns(
             [invisible, up_table], equal=True, expand=False, padding=(0, 0)
