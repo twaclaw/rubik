@@ -12,14 +12,14 @@ from .solver import Solver
 console = Console()
 
 
-def create_video(args, moves_ph1, moves_ph2, format:str = "mp4"):
+def create_video(args, moves_ph1, moves_ph2, moves_ph1_htm=None, moves_ph2_htm=None, format:str = "mp4"):
     import os
     import sys
     from contextlib import contextmanager
 
     from manim import tempconfig
 
-    from rubik.animation.manim_rubik import RubiksCubeAnimation
+    from rubik.animation.manim_rubik import RubiksCubeAnimation, RubiksCubeStatic
 
     # Set configuration for low quality video (faster)
     manim_config = {
@@ -37,6 +37,11 @@ def create_video(args, moves_ph1, moves_ph2, format:str = "mp4"):
 
     if format == "gif":
         manim_config["format"] = "gif"
+    elif format == "png":
+        manim_config["write_to_movie"] = False
+        manim_config["save_last_frame"] = True
+        manim_config["format"] = "png"
+        manim_config["output_file"] = "image.png"
 
     @contextmanager
     def suppress_stdout_stderr():
@@ -53,9 +58,16 @@ def create_video(args, moves_ph1, moves_ph2, format:str = "mp4"):
 
     with tempconfig(manim_config):
         with suppress_stdout_stderr():
-            scene = RubiksCubeAnimation(
-                moves_ph1=moves_ph1, moves_ph2=moves_ph2, initial_state=args.cube_string
-            )
+            if format == "png":
+                scene = RubiksCubeStatic(
+                    moves_ph1=moves_ph1, moves_ph2=moves_ph2, initial_state=args.cube_string,
+                    moves_ph1_htm=moves_ph1_htm, moves_ph2_htm=moves_ph2_htm
+                )
+            else:
+                scene = RubiksCubeAnimation(
+                    moves_ph1=moves_ph1, moves_ph2=moves_ph2, initial_state=args.cube_string,
+                    moves_ph1_htm=moves_ph1_htm, moves_ph2_htm=moves_ph2_htm
+                )
             scene.render()
 
 
@@ -94,34 +106,42 @@ def call_solver(args):
         c = cc.to_cube()
 
     r = solver.solve(args.cube_string)
+
+    ph1_str = "".join(r.ph1_htm)
+    ph2_str = "".join(r.ph2_htm)
     console.rule("[bold] Results")
     console.print("Algorithm: Kociemba's Two-Phase")
     console.print(f"Cube String: [bold yellow]{args.cube_string}[/bold yellow]")
     console.print(
-        f"Solution HTM: [bold cyan]{r.ph1_htm}[/bold cyan][bold magenta]{r.ph2_htm}[/bold magenta]"
+        f"Solution HTM: [bold cyan]{ph1_str}[/bold cyan][bold magenta]{ph2_str}[/bold magenta]"
     )
     console.print(f"Solved in [bold]{r.execution_time * 1000:.2f} ms[/bold].")
 
     console.rule("[bold] Original Cube")
     c.plot_cube(plot_with_labels=args.with_labels)
-    c.moves(r.ph1_htm)
+    c.moves(ph1_str)
     console.rule("[bold] After Phase 1")
-    console.print(f"[bold cyan]Phase 1 moves: {r.ph1_htm}[/bold cyan]")
+    console.print(f"[bold cyan]Phase 1 moves: {ph1_str}[/bold cyan]")
     c.plot_cube(plot_with_labels=args.with_labels)
-    c.moves(r.ph2_htm)
+    c.moves(ph2_str)
     console.rule("[bold] Solved Cube")
-    console.print(f"[bold magenta]Phase 2 moves: {r.ph2_htm}[/bold magenta]")
+    console.print(f"[bold magenta]Phase 2 moves: {ph2_str}[/bold magenta]")
     c.plot_cube(plot_with_labels=args.with_labels)
 
     if args.video:
         console.rule("[bold] Generating Video")
-        create_video(args, r.ph1_str.split(), r.ph2_str.split())
+        create_video(args, r.ph1_str, r.ph2_str, moves_ph1_htm=r.ph1_htm, moves_ph2_htm=r.ph2_htm)
         console.print("[bold green]Video generated as video.mp4[/bold green]")
 
     if args.gif:
         console.rule("[bold] Generating GIF")
-        create_video(args, r.ph1_str.split(), r.ph2_str.split(), format="gif")
+        create_video(args, r.ph1_str, r.ph2_str, moves_ph1_htm=r.ph1_htm, moves_ph2_htm=r.ph2_htm, format="gif")
         console.print("[bold green]GIF generated as video.gif[/bold green]")
+
+    if args.image:
+        console.rule("[bold] Generating Image")
+        create_video(args, r.ph1_str, r.ph2_str, moves_ph1_htm=r.ph1_htm, moves_ph2_htm=r.ph2_htm, format="png")
+        console.print("[bold green]Image generated as image.png[/bold green]")
 
 
 def main():

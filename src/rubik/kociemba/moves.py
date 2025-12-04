@@ -63,9 +63,8 @@ class Moves:
             for i in iterator:
                 a.set_twist(i)
                 for j in Color:  # six faces U, R, F, D, L, B
-                    for m in range(
-                        3
-                    ):  # three moves for each face, for example U, U2, U3 = U'
+                    # three moves for each face, for example U, U2, U3 = U'
+                    for m in range(3):
                         a.corner_multiply(BasicMoves[j])
                         self.twist_move[k.N_MOVE * i + 3 * j + m] = a.get_twist()
                     a.corner_multiply(BasicMoves[j])  # 4. move restores face

@@ -183,7 +183,7 @@ class CubieCube:
     @staticmethod
     def c_nk(n: int, k: int) -> int:
         """Compute the binomial coefficient C(n, k)"""
-        return math.comb(n, k)
+        return math.comb(n, k) #TODO: see if it is worth to replace by pre-computed table
 
     def __eq__(self, other: object) -> bool:
         return np.array_equal(self.corners, other.corners) and np.array_equal(
@@ -291,6 +291,7 @@ class CubieCube:
 
     def get_twist(self) -> int:
         """Compute the twist coordinate (corner orientations) of this CubieCube."""
+        # np.polyval(p, x) = p[0]*x**(N-1) + p[1]*x**(N-2) + ... + p[N-2]*x + p[N-1]
         return np.polyval(self.corners[:-1, 1], 3).astype(int)
 
     def set_twist(self, twist: int) -> None:
@@ -365,7 +366,7 @@ class CubieCube:
         slice_edge = self.lc4.decode(b, minvalue=Edge.FR)
 
         x = 4
-        for j in range(12):
+        for j in range(self.num_edges):
             if x == 0:
                 break
             comb = self.c_nk(11 - j, x)
@@ -388,7 +389,7 @@ class CubieCube:
         j_indices = indices[::-1]
 
         x = np.arange(len(j_indices))
-        a = np.sum(self._comb_vectorized(11 - j_indices, x + 1))
+        a = np.sum(self._comb_vectorized(self.num_edges -1 - j_indices, x + 1))
 
         edge4 = ep_mod[indices]
         b = self.lc4.encode(edge4, minvalue=Edge.UR)
@@ -401,14 +402,14 @@ class CubieCube:
         b = idx % 24
         a = idx // 24
 
-        ep = np.full(12, -1, dtype=int)
+        ep = np.full(self.num_edges, -1, dtype=int)
         slice_edge = self.lc4.decode(b, minvalue=Edge.UR)
 
         x = 4
         for j in range(12):
             if x == 0:
                 break
-            comb = self.c_nk(11 - j, x)
+            comb = self.c_nk(self.num_edges - 1 - j, x)
             if a >= comb:
                 ep[j] = slice_edge[4 - x]
                 a -= comb
@@ -428,7 +429,7 @@ class CubieCube:
         j_indices = indices[::-1]
 
         x = np.arange(len(j_indices))
-        a = np.sum(self._comb_vectorized(11 - j_indices, x + 1))
+        a = np.sum(self._comb_vectorized(self.num_edges - 1 - j_indices, x + 1))
 
         edge4 = ep_mod[indices]
         b = self.lc4.encode(edge4, minvalue=Edge.DR)
@@ -441,14 +442,14 @@ class CubieCube:
         b = idx % 24
         a = idx // 24
 
-        ep = np.full(12, -1, dtype=int)
+        ep = np.full(self.num_edges, -1, dtype=int)
         slice_edge = self.lc4.decode(b, minvalue=Edge.DR)
 
         x = 4
-        for j in range(12):
+        for j in range(self.num_edges):
             if x == 0:
                 break
-            comb = self.c_nk(11 - j, x)
+            comb = self.c_nk(self.num_edges - 1 - j, x)
             if a >= comb:
                 ep[j] = slice_edge[4 - x]
                 a -= comb

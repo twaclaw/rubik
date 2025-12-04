@@ -14,11 +14,12 @@ from .pruning import Pruning
 
 @dataclass
 class SolverResult:
-    ph1_str: str
-    ph2_str: str
-    ph1_htm: str
-    ph2_htm: str
+    ph1_str: list[str]
+    ph2_str: list[str]
+    ph1_htm: list[str]
+    ph2_htm: list[str]
     execution_time: float
+
 
 class Solver:
     def __init__(self, folder: str = k.FOLDER, show_progress: bool = True):
@@ -45,7 +46,6 @@ class Solver:
         CoordCube.pruning = self.pruning
         CoordCube.symmetries = self.symmetries
         CoordCube.coord = self.coord
-
 
         # Internal cube
         self.cb_cube = CubieCube()
@@ -88,7 +88,9 @@ class Solver:
 
                 corners_new = self.moves.corners_move[18 * int(corners) + m]
                 ud_edges_new = self.moves.ud_edges_move[18 * int(ud_edges) + m]
-                slice_sorted_new = self.moves.slice_sorted_move[18 * int(slice_sorted) + m]
+                slice_sorted_new = self.moves.slice_sorted_move[
+                    18 * int(slice_sorted) + m
+                ]
 
                 classidx = self.symmetries.corner_classidx[corners_new]
                 sym = self.symmetries.corner_sym[corners_new]
@@ -145,9 +147,12 @@ class Solver:
                 self.cornersave = corners
 
             # new solution must be shorter and we do not use phase 2 maneuvers with length > 11 - 1 = 10
-            togo2_limit = 11 # min(self.shortest_length[0] - len(self.sofar_phase1), 11)
+            togo2_limit = (
+                11  # min(self.shortest_length[0] - len(self.sofar_phase1), 11)
+            )
             if (
-                self.pruning.cornslice_depth[24 * int(corners) + int(slice_sorted)] >= togo2_limit
+                self.pruning.cornslice_depth[24 * int(corners) + int(slice_sorted)]
+                >= togo2_limit
             ):  # precheck speeds up the computation
                 return
 
@@ -203,10 +208,12 @@ class Solver:
 
                 flip_new = self.moves.flip_move[18 * int(flip) + m]  # N_MOVE = 18
                 twist_new = self.moves.twist_move[18 * int(twist) + m]
-                slice_sorted_new = self.moves.slice_sorted_move[18 * int(slice_sorted) + m]
+                slice_sorted_new = self.moves.slice_sorted_move[
+                    18 * int(slice_sorted) + m
+                ]
 
-                flipslice = (
-                    2048 * int(slice_sorted_new // 24) + int(flip_new)
+                flipslice = 2048 * int(slice_sorted_new // 24) + int(
+                    flip_new
                 )  # N_FLIP * (slice_sorted // N_PERM_4) + flip
                 classidx = self.symmetries.flipslice_classidx[flipslice]
                 sym = self.symmetries.flipslice_sym[flipslice]
@@ -253,10 +260,10 @@ class Solver:
                 break
         t = time.perf_counter() - t0
 
-        ph1_htm = "".join([Move.to_htm(m) for m in self.solution_ph1])
-        ph2_htm = "".join([Move.to_htm(m) for m in self.solution_ph2])
-        ph1_str = " ".join([Move.to_manim_str(m) for m in self.solution_ph1])
-        ph2_str = " ".join([Move.to_manim_str(m) for m in self.solution_ph2])
+        ph1_htm = [Move.to_htm(m) for m in self.solution_ph1]
+        ph2_htm = [Move.to_htm(m) for m in self.solution_ph2]
+        ph1_str = [Move.to_manim_str(m) for m in self.solution_ph1]
+        ph2_str = [Move.to_manim_str(m) for m in self.solution_ph2]
         return SolverResult(
             ph1_str=ph1_str,
             ph2_str=ph2_str,
