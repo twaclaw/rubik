@@ -14,20 +14,73 @@ from .ids import INFO as ids_info
 from .ids import ids
 
 console = Console()
-def run_solver(cube: Cube, algorithm: str):
+
+
+def create_video(args, moves_fwd, moves_bcw, cube_string, format:str = "mp4"):
+
+
+    import os
+    import sys
+    from contextlib import contextmanager
+
+    from manim import tempconfig
+
+    from rubik.animation.manim_rubik import MeetInTheMiddleAnimation
+
+    # Set configuration for low quality video (faster)
+    manim_config = {
+        "pixel_height": 480,
+        "pixel_width": 854,
+        "frame_rate": 15,
+        "quality": "low_quality",
+        "preview": False,
+        "write_to_movie": True,
+        "save_last_frame": False,
+        "output_file": f"video.{format}",
+        "verbosity": "CRITICAL",
+        "progress_bar": "none",
+    }
+
+    if format == "gif":
+        manim_config["format"] = "gif"
+
+    @contextmanager
+    def suppress_stdout_stderr():
+        with open(os.devnull, "w") as devnull:
+            old_stdout = sys.stdout
+            old_stderr = sys.stderr
+            sys.stdout = devnull
+            sys.stderr = devnull
+            try:
+                yield
+            finally:
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
+
+    with tempconfig(manim_config):
+        with suppress_stdout_stderr():
+            scene = MeetInTheMiddleAnimation(
+                moves_1=moves_fwd, moves_2=moves_bcw, initial_state_1=cube_string,
+                initial_state_2="UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB"
+            )
+            scene.render()
+
+
+def run_solver(cube: Cube, args):
+    algorithm = args.algorithm
     solver_fn: callable | None = None
     if algorithm == "bfs":
         solver_fn = bfs
-        algorithm = bfs_info["algorithm"]
+        algorithm_name = bfs_info["algorithm"]
     elif algorithm == "iddfs":
         solver_fn = ids
-        algorithm = ids_info["algorithm"]
+        algorithm_name = ids_info["algorithm"]
     elif algorithm == "bi-bfs":
         solver_fn = bi_bfs
-        algorithm = bi_bfs_info["algorithm"]
+        algorithm_name = bi_bfs_info["algorithm"]
     elif algorithm == "bi-iddfs":
         solver_fn = bi_ids
-        algorithm = bi_ids_info["algorithm"]
+        algorithm_name = bi_ids_info["algorithm"]
     else:
         raise ValueError(f"Unknown algorithm: {algorithm}")
 
@@ -35,8 +88,11 @@ def run_solver(cube: Cube, algorithm: str):
     cube_string = cube.to_string()
     cube0 = cube.copy()
 
+    results = None
     try:
-        solution, n_visited = solver_fn(cube)
+        results = solver_fn(cube)
+        solution = results.solution_path
+        n_visited = results.nvisited
     except KeyboardInterrupt:
         console.print("[bold red]Solving interrupted by user[/bold red]")
         solution, n_visited = None, 0
@@ -47,7 +103,7 @@ def run_solver(cube: Cube, algorithm: str):
     t = time.perf_counter() - t0
 
     console.rule("[bold] Results")
-    console.print(f"Algorithm: [bold]{algorithm}[/bold]")
+    console.print(f"Algorithm: [bold]{algorithm_name}[/bold]")
     console.print(f"Number of visited states: [bold]{n_visited:,} - ({n_visited//t:,}/s)[/bold]")
     console.print(f"Cube String: [bold cyan]{cube_string}[/bold cyan]")
     solution_str = "".join(solution) if solution is not None else "No solution found"
@@ -59,6 +115,20 @@ def run_solver(cube: Cube, algorithm: str):
         console.rule("[bold] Solved Cube")
         cube0.moves(solution)
         cube0.plot_cube()
+        if args.size == 3:
+            if algorithm.startswith("bi-") and args.video:
+                console.rule("[bold]Generating video")
+                moves_fwd = results.forward_path
+                moves_bcw = results.backward_path
+                create_video(args, moves_fwd, moves_bcw, cube_string, format="mp4")
+                console.print("[bold green]Video saved as video.mp4[/bold green]")
+            if algorithm.startswith("bi-") and args.gif:
+                console.print("[bold]Generating GIF...[/bold]")
+                moves_fwd = results.forward_path
+                moves_bcw = results.backward_path
+                create_video(args, moves_fwd, moves_bcw, cube_string, format="gif")
+                console.print("[bold green]GIF saved as video.gif[/bold green]")
+
 
 
 def main():
@@ -92,6 +162,10 @@ def main():
         default="bi-iddfs",
         help="Solving algorithm to use: 'bfs' or 'bi_ids'. Default is 'bfs'",
     )
+
+    parser.add_argument("--video", action="store_true", help="Generate a video of the solution")
+    parser.add_argument("--gif", action="store_true", help="Generate a GIF of the solution")
+
     args = parser.parse_args()
 
     cube = Cube(
@@ -105,9 +179,9 @@ def main():
         console.print(
             "[bold]Solving cubes larger than 2x2 may be very slow or even intractable![/bold]"
         )
-        if args.size == 3:
-            console.print(
-                "[bold]Use the [yellow]kociemba[/yellow] command line tool for faster solving of 3x3 cubes[/bold]"
-            )
+        # if args.size == 3:
+        #     console.print(
+        #         "[bold]Use the [yellow]kociemba[/yellow] command line tool for faster solving of 3x3 cubes[/bold]"
+        #     )
 
-    run_solver(cube, args.algorithm)
+    run_solver(cube, args)
