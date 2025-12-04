@@ -3,43 +3,28 @@ This code is a subset modified from this package: https://manim-rubikscube.readt
 at https://github.com/WampyCakes/manim-rubikscube
 """
 
+import manim as mn
 import numpy as np
-from manim import (
-    BLACK,
-    DEGREES,
-    DOWN,
-    IN,
-    LEFT,
-    ORIGIN,
-    OUT,
-    PI,
-    RIGHT,
-    UL,
-    UP,
-    WHITE,
-    X_AXIS,
-    Y_AXIS,
-    Z_AXIS,
-    Animation,
-    Mobject,
-    Square,
-    Text,
-    ThreeDScene,
-    VGroup,
-    VMobject,
-)
-from manim.utils.space_ops import z_to_vector
+
+my_template = mn.TexTemplate()
+my_template.add_to_preamble(r"\usepackage{xcolor}")
 
 # --- Utils ---
+def normalize_moves(moves: list[str]) -> list[str]:
+    return [m.upper() + "'" if m.islower() else m for m in moves]
+
+def htm_str_inverse(moves: str) -> str:
+    return [m.swapcase() for m in moves[::-1]]
+
 
 
 def get_axis_from_face(face):
     if face == "F" or face == "B":
-        return X_AXIS
+        return mn.X_AXIS
     elif face == "U" or face == "D":
-        return Z_AXIS
+        return mn.Z_AXIS
     else:
-        return Y_AXIS
+        return mn.Y_AXIS
 
 
 def get_faces_of_cubie(dim, position):
@@ -47,15 +32,15 @@ def get_faces_of_cubie(dim, position):
     try:
         faces = {
             # Front corners
-            (0, 0, 0): [LEFT, DOWN, IN],
-            (0, 0, dim): [LEFT, DOWN, OUT],
-            (0, dim, 0): [LEFT, UP, IN],
-            (0, dim, dim): [LEFT, UP, OUT],
+            (0, 0, 0): [mn.LEFT, mn.DOWN, mn.IN],
+            (0, 0, dim): [mn.LEFT, mn.DOWN, mn.OUT],
+            (0, dim, 0): [mn.LEFT, mn.UP, mn.IN],
+            (0, dim, dim): [mn.LEFT, mn.UP, mn.OUT],
             # Back corners
-            (dim, 0, 0): [RIGHT, DOWN, IN],
-            (dim, 0, dim): [RIGHT, DOWN, OUT],
-            (dim, dim, 0): [RIGHT, UP, IN],
-            (dim, dim, dim): [RIGHT, UP, OUT],
+            (dim, 0, 0): [mn.RIGHT, mn.DOWN, mn.IN],
+            (dim, 0, dim): [mn.RIGHT, mn.DOWN, mn.OUT],
+            (dim, dim, 0): [mn.RIGHT, mn.UP, mn.IN],
+            (dim, dim, dim): [mn.RIGHT, mn.UP, mn.OUT],
         }
         return faces[position]
     except Exception:
@@ -65,48 +50,48 @@ def get_faces_of_cubie(dim, position):
 
         if x == 0:
             if y == 0:
-                return [DOWN, LEFT]
+                return [mn.DOWN, mn.LEFT]
             elif y == dim:
-                return [UP, LEFT]
+                return [mn.UP, mn.LEFT]
             else:
                 if z == 0:
-                    return [IN, LEFT]
+                    return [mn.IN, mn.LEFT]
                 elif z == dim:
-                    return [OUT, LEFT]
+                    return [mn.OUT, mn.LEFT]
                 else:
-                    return [LEFT]
+                    return [mn.LEFT]
         elif x == dim:
             if y == 0:
-                return [DOWN, RIGHT]
+                return [mn.DOWN, mn.RIGHT]
             elif y == dim:
-                return [UP, RIGHT]
+                return [mn.UP, mn.RIGHT]
             else:
                 if z == 0:
-                    return [IN, RIGHT]
+                    return [mn.IN, mn.RIGHT]
                 elif z == dim:
-                    return [OUT, RIGHT]
+                    return [mn.OUT, mn.RIGHT]
                 else:
-                    return [RIGHT]
+                    return [mn.RIGHT]
         else:
             if y == 0:
                 if z == 0:
-                    return [IN, DOWN]
+                    return [mn.IN, mn.DOWN]
                 elif z == dim:
-                    return [OUT, DOWN]
+                    return [mn.OUT, mn.DOWN]
                 else:
-                    return [DOWN]
+                    return [mn.DOWN]
             elif y == dim:
                 if z == 0:
-                    return [IN, UP]
+                    return [mn.IN, mn.UP]
                 elif z == dim:
-                    return [OUT, UP]
+                    return [mn.OUT, mn.UP]
                 else:
-                    return [UP]
+                    return [mn.UP]
             else:
                 if z == 0:
-                    return [IN]
+                    return [mn.IN]
                 elif z == dim:
-                    return [OUT]
+                    return [mn.OUT]
                 else:
                     return []
 
@@ -114,7 +99,7 @@ def get_faces_of_cubie(dim, position):
 # --- Classes ---
 
 
-class Cubie(VGroup):
+class Cubie(mn.VGroup):
     def __init__(self, x, y, z, dim, colors, **kwargs):
         super().__init__(**kwargs)
         self.dimensions = dim
@@ -142,16 +127,16 @@ class Cubie(VGroup):
             )
         ).tolist()
         i = 0
-        for vect in OUT, DOWN, LEFT, IN, UP, RIGHT:
-            face = Square(side_length=2, shade_in_3d=True, stroke_width=3)
+        for vect in mn.OUT, mn.DOWN, mn.LEFT, mn.IN, mn.UP, mn.RIGHT:
+            face = mn.Square(side_length=2, shade_in_3d=True, stroke_width=3)
             if vect.tolist() in faces:
                 face.set_fill(self.colors[i], 1)
             else:
-                face.set_fill(BLACK, 1)
+                face.set_fill(mn.BLACK, 1)
 
             face.flip()
-            face.shift(2 * OUT / 2.0)
-            face.apply_matrix(z_to_vector(vect))
+            face.shift(2 * mn.OUT / 2.0)
+            face.apply_matrix(mn.utils.space_ops.z_to_vector(vect))
 
             self.faces[tuple(vect)] = face
             self.add(face)
@@ -159,24 +144,24 @@ class Cubie(VGroup):
 
     def get_face(self, face):
         if face == "F":
-            return self.faces[tuple(LEFT)]
+            return self.faces[tuple(mn.LEFT)]
         elif face == "B":
-            return self.faces[tuple(RIGHT)]
+            return self.faces[tuple(mn.RIGHT)]
         elif face == "R":
-            return self.faces[tuple(DOWN)]
+            return self.faces[tuple(mn.DOWN)]
         elif face == "L":
-            return self.faces[tuple(UP)]
+            return self.faces[tuple(mn.UP)]
         elif face == "U":
-            return self.faces[tuple(OUT)]
+            return self.faces[tuple(mn.OUT)]
         elif face == "D":
-            return self.faces[tuple(IN)]
+            return self.faces[tuple(mn.IN)]
 
 
-class RubiksCube(VMobject):
+class RubiksCube(mn.VMobject):
     def __init__(
         self,
         dim=3,
-        colors=[WHITE, "#C41E3A", "#009E60", "#FFD500", "#FF5800", "#0051BA"], #TODO: check
+        colors=[mn.WHITE, "#0051BA", "#C41E3A", "#FFD500", "#009E60", "#FF5800"], # U, R, F, D, L, B
         x_offset=2.1,
         y_offset=2.1,
         z_offset=2.1,
@@ -188,14 +173,14 @@ class RubiksCube(VMobject):
 
         self.dimensions = dim
         self.colors = colors
-        self.x_offset = [[Mobject.shift, [x_offset, 0, 0]]]
-        self.y_offset = [[Mobject.shift, [0, y_offset, 0]]]
-        self.z_offset = [[Mobject.shift, [0, 0, z_offset]]]
+        self.x_offset = [[mn.Mobject.shift, [x_offset, 0, 0]]]
+        self.y_offset = [[mn.Mobject.shift, [0, y_offset, 0]]]
+        self.z_offset = [[mn.Mobject.shift, [0, 0, z_offset]]]
         self.indices = {}
 
         self.cubies = np.ndarray((dim, dim, dim), dtype=Cubie)
         self.generate_cubies()
-        self.move_to(ORIGIN)
+        self.move_to(mn.ORIGIN)
         self.set_indices()
 
     def generate_cubies(self):
@@ -298,11 +283,11 @@ class RubiksCube(VMobject):
     def perform_move(self, move):
         face = move[0]
         axis = get_axis_from_face(face)
-        angle = PI / 2 if ("R" in move or "F" in move or "D" in move) else -PI / 2
+        angle = mn.PI / 2 if ("R" in move or "F" in move or "D" in move) else -mn.PI / 2
         angle = angle if "2" not in move else angle * 2
         angle = -angle if "'" in move else angle
 
-        VGroup(*self.get_face(face)).rotate(angle, axis)
+        mn.VGroup(*self.get_face(face)).rotate(angle, axis)
         self.adjust_indices(self.get_face(face, False))
 
     def perform_sequence(self, moves):
@@ -322,11 +307,11 @@ class RubiksCube(VMobject):
         return self
 
 
-class CubeMove(Animation):
+class CubeMove(mn.Animation):
     def __init__(self, mobject, face, **kwargs):
         self.axis = get_axis_from_face(face[0])
         self.face = face
-        self.angle = PI / 2 if ("R" in face or "F" in face or "D" in face) else -PI / 2
+        self.angle = mn.PI / 2 if ("R" in face or "F" in face or "D" in face) else -mn.PI / 2
         self.angle = self.angle if "2" not in face else self.angle * 2
         self.angle = -self.angle if "'" in face else self.angle
         super().__init__(mobject, **kwargs)
@@ -340,7 +325,7 @@ class CubeMove(Animation):
     def interpolate_mobject(self, alpha):
         self.mobject.become(self.starting_mobject)
 
-        VGroup(*self.mobject.get_face(self.face[0])).rotate(
+        mn.VGroup(*self.mobject.get_face(self.face[0])).rotate(
             alpha * self.angle, self.axis
         )
 
@@ -349,10 +334,13 @@ class CubeMove(Animation):
         self.mobject.adjust_indices(self.mobject.get_face(self.face[0], False))
 
 
-class RubiksCubeAnimation(ThreeDScene):
-    def __init__(self, moves_ph1, moves_ph2, initial_state, **kwargs):
+class RubiksCubeAnimation(mn.ThreeDScene):
+    """Animates the solving of a Rubik's Cube given the phase1 and phase2  sequences of Kociemba's algorithm"""
+    def __init__(self, moves_ph1, moves_ph2, initial_state, moves_ph1_htm=None, moves_ph2_htm=None, **kwargs):
         self.moves_ph1 = moves_ph1
         self.moves_ph2 = moves_ph2
+        self.moves_ph1_htm = moves_ph1_htm if moves_ph1_htm is not None else moves_ph1
+        self.moves_ph2_htm = moves_ph2_htm if moves_ph2_htm is not None else moves_ph2
         self.initial_state = initial_state
         super().__init__(**kwargs)
 
@@ -360,12 +348,12 @@ class RubiksCubeAnimation(ThreeDScene):
         self.begin_ambient_camera_rotation(rate=rate)
         self.wait(delay)
         self.stop_ambient_camera_rotation()
-        self.move_camera(phi=60 * DEGREES, theta=-45 * DEGREES)
+        self.move_camera(phi=60 * mn.DEGREES, theta=-135 * mn.DEGREES)
 
 
     def construct(self):
         self.cube = RubiksCube().scale(0.6)
-        self.cube.move_to(ORIGIN)
+        self.cube.move_to(mn.ORIGIN)
 
         if self.initial_state:
             if isinstance(self.initial_state, str) and len(self.initial_state) == 54 and " " not in self.initial_state:
@@ -374,48 +362,194 @@ class RubiksCubeAnimation(ThreeDScene):
                 self.cube.perform_sequence(self.initial_state)
 
         self.add(self.cube)
-        self.set_camera_orientation(phi=60 * DEGREES, theta=-45 * DEGREES)
+        self.set_camera_orientation(phi=60 * mn.DEGREES, theta=-135 * mn.DEGREES)
 
-        label1 = Text(f"Initial stage: {self.initial_state}", font_size=24).to_corner(UL)
+        label1 = mn.Text(f"Initial string: {self.initial_state}", font_size=24).to_corner(mn.UL)
         self.add_fixed_in_frame_mobjects(label1)
         self.rotate(delay=6, rate=0.5)
         self.remove(label1)
 
         if self.moves_ph1:
-            label2 = Text(f"Applying phase 1 moves: {''.join(self.moves_ph1)}", font_size=24).to_corner(UL)
-            self.add_fixed_in_frame_mobjects(label2)
-            self.wait(3)
-            self.animate_sequence(self.moves_ph1)
-            self.remove(label2)
+            self.animate_sequence(self.moves_ph1, self.moves_ph1_htm, "Applying phase 1 moves: ")
 
         self.rotate(delay=6, rate=0.5)
         if self.moves_ph2:
-            label3 = Text(f"Applying phase 2 moves: {''.join(self.moves_ph2)}", font_size=24).to_corner(UL)
-            self.add_fixed_in_frame_mobjects(label3)
-            self.wait(3)
-            self.animate_sequence(self.moves_ph2)
-            self.remove(label3)
+            self.animate_sequence(self.moves_ph2, self.moves_ph2_htm, "Applying phase 2 moves: ")
 
         self.rotate(delay=6, rate=0.5)
 
 
-    def animate_sequence(self, moves):
-        for move in moves:
+    def animate_sequence(self, moves, moves_htm, prefix):
+        current_text = ""
+        label = mn.Text(prefix, font_size=36).to_corner(mn.UL)
+        self.add_fixed_in_frame_mobjects(label)
+        self.wait(1)
+
+        for i, move in enumerate(moves):
+            if i < len(moves_htm):
+                current_text += moves_htm[i] + " "
+                self.remove(label)
+                label = mn.Text(prefix + current_text, font_size=36).to_corner(mn.UL)
+                self.add_fixed_in_frame_mobjects(label)
+
             self.play(CubeMove(self.cube, move), run_time=0.5)
+
             self.wait(0.1)
 
+        self.wait(2)
+        self.remove(label)
 
-class RubiksCubeStatic(ThreeDScene):
+
+class RubiksCubeStatic(mn.ThreeDScene):
+    """Displays static Rubik's Cube states given the phase1 and phase2  sequences of Kociemba's algorithm
+    - Initial state
+    - State after phase 1
+    - State after phase 2 -> solved cube
+    """
+    def __init__(self, moves_ph1, moves_ph2, initial_state, moves_ph1_htm=None, moves_ph2_htm=None, **kwargs):
+        self.moves_ph1 = moves_ph1
+        self.moves_ph2 = moves_ph2
+        self.moves_ph1_htm = moves_ph1_htm if moves_ph1_htm is not None else moves_ph1
+        self.moves_ph2_htm = moves_ph2_htm if moves_ph2_htm is not None else moves_ph2
+        self.initial_state = initial_state
+        super().__init__(**kwargs)
+
     def construct(self):
-        self.cube = RubiksCube().scale(0.6)
-        self.add(self.cube)
-        self.set_camera_orientation(phi=60 * DEGREES, theta=-45 * DEGREES)
+        self.set_camera_orientation(phi=60 * mn.DEGREES, theta=-135 * mn.DEGREES)
 
-        # Apply moves instantly without animation
-        moves = ["R", "U", "R'", "U'"]
-        for move in moves:
-            anim = CubeMove(self.cube, move)
-            VGroup(*self.cube.get_face(anim.face[0])).rotate(anim.angle, anim.axis)
-            self.cube.adjust_indices(self.cube.get_face(anim.face[0], False))
+        # Cube 1: Initial
+        cube1 = RubiksCube().scale(0.4)
+        cube1.move_to(mn.LEFT * 4.5)
+        self.setup_cube(cube1, self.initial_state)
 
-        # Manim will automatically save the last frame as an image if run with -s
+        # Cube 2: After Phase 1
+        cube2 = RubiksCube().scale(0.4)
+        cube2.move_to(mn.ORIGIN)
+        self.setup_cube(cube2, self.initial_state)
+        if self.moves_ph1:
+            cube2.perform_sequence(self.moves_ph1)
+
+        # Cube 3: After Phase 2
+        cube3 = RubiksCube().scale(0.4)
+        cube3.move_to(mn.RIGHT * 4.5)
+        self.setup_cube(cube3, self.initial_state)
+        if self.moves_ph1:
+            cube3.perform_sequence(self.moves_ph1)
+        if self.moves_ph2:
+            cube3.perform_sequence(self.moves_ph2)
+
+        self.add(cube1, cube2, cube3)
+
+    def setup_cube(self, cube, initial_state):
+        if initial_state:
+            if isinstance(initial_state, str) and len(initial_state) == 54 and " " not in initial_state:
+                cube.set_state(initial_state)
+            else:
+                cube.perform_sequence(initial_state)
+
+
+class MeetInTheMiddleAnimation(mn.ThreeDScene):
+    """Animates the meet-in-the-middle solving of a Rubik's Cube given two sequences of moves from both ends"""
+    def __init__(self, initial_state_1=None, moves_1=None, initial_state_2=None, moves_2=None, **kwargs):
+        self.initial_state_1 = initial_state_1
+        self.moves_1_htm = moves_1 or []
+        self.initial_state_2 = initial_state_2
+        self.moves_2_htm = moves_2 or []
+
+        self.moves_1 = normalize_moves(self.moves_1_htm)
+        self.moves_2 = normalize_moves(self.moves_2_htm)
+        super().__init__(**kwargs)
+
+
+    def construct(self):
+        self.cube1 = RubiksCube().scale(0.5)
+        self.cube2 = RubiksCube().scale(0.5)
+
+        self.cube1.move_to((mn.LEFT + mn.UP) * 3)
+        self.cube2.move_to((mn.RIGHT + mn.DOWN) * 3)
+
+        self.setup_cube(self.cube1, self.initial_state_1)
+        self.setup_cube(self.cube2, self.initial_state_2)
+
+        self.add(self.cube1)
+        self.add(self.cube2)
+
+        self.set_camera_orientation(phi=60 * mn.DEGREES, theta=-135 * mn.DEGREES)
+
+        self.wait(1)
+
+        self.animate_sequences(self.moves_1, self.moves_2, delay=0.5)
+
+    def setup_cube(self, cube, initial_state):
+        if initial_state:
+            if isinstance(initial_state, str) and len(initial_state) == 54 and " " not in initial_state:
+                cube.set_state(initial_state)
+            else:
+                cube.perform_sequence(initial_state)
+
+    def animate_sequences(self, moves1, moves2, delay: float = 1.0):
+        len1 = len(moves1)
+        len2 = len(moves2)
+        max_len = max(len1, len2)
+
+        str1 = ""
+        str2 = ""
+
+        text1 = mn.Text(str1, font_size=24).to_corner(mn.DL).shift(mn.UP * 0.5 + mn.RIGHT * 0.5)
+        text2 = mn.Text(str2, font_size=24).to_corner(mn.DR).shift(mn.UP * 0.5 + mn.LEFT * 0.5)
+        bwd_str = "".join(self.moves_2_htm)
+        bwd_str_inv = "".join(htm_str_inverse(self.moves_2_htm))
+        fwd_str = "".join(self.moves_1_htm)
+
+        solution_text = mn.Tex(fr"\textbf{{Solution:}} \boldmath${fwd_str} + ({{\color{{yellow}}{bwd_str}}})^{{-1}} = {fwd_str}{{\color{{yellow}}{bwd_str_inv}}}$", font_size=42, tex_template=my_template)
+        text3 = mn.Text("Applying solution to original cube:", font_size=24).next_to(solution_text, mn.DOWN)
+
+        self.add_fixed_in_frame_mobjects(text1, text2)
+
+        for i in range(max_len):
+            animations = []
+            if i < len1:
+                animations.append(CubeMove(self.cube1, moves1[i]))
+                if i < len(self.moves_1_htm):
+                    str1 += self.moves_1_htm[i] + " "
+            if i < len2:
+                animations.append(CubeMove(self.cube2, moves2[i]))
+                if i < len(self.moves_2_htm):
+                    str2 += self.moves_2_htm[i] + " "
+
+            if animations:
+                self.play(*animations, run_time=0.5)
+
+                self.remove(text1, text2)
+                text1 = mn.Text(str1, font_size=36).to_corner(mn.DL).shift(mn.UP * 0.5 + mn.RIGHT * 0.5)
+                text2 = mn.Text(str2, font_size=36, color=mn.YELLOW).to_corner(mn.DR).shift(mn.UP * 0.5 + mn.LEFT * 0.5)
+                self.add_fixed_in_frame_mobjects(text1, text2)
+
+                self.wait(delay)
+        self.wait(2)
+        solution_text.to_edge(mn.UP)
+        self.add_fixed_in_frame_mobjects(solution_text)
+        self.wait(3)
+
+        # Restart cubes to initial states
+        self.play(mn.FadeOut(self.cube1), mn.FadeOut(self.cube2))
+
+        self.cube1 = RubiksCube().scale(0.5)
+        self.cube1.move_to((mn.LEFT + mn.UP) * 3)
+        self.setup_cube(self.cube1, self.initial_state_1)
+
+        self.cube2 = RubiksCube().scale(0.5)
+        self.cube2.move_to((mn.RIGHT + mn.DOWN) * 3)
+        self.setup_cube(self.cube2, self.initial_state_2)
+
+        self.play(mn.FadeIn(self.cube1), mn.FadeIn(self.cube2))
+        text3.next_to(solution_text, mn.DOWN)
+        self.add_fixed_in_frame_mobjects(text3)
+        self.wait(2)
+        # self.remove(solution_text)
+
+
+        solution_moves = self.moves_1 + normalize_moves(htm_str_inverse(self.moves_2_htm))
+        for move in solution_moves:
+            self.play(CubeMove(self.cube1, move), run_time=delay)
+        self.wait(1)
