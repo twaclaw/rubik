@@ -364,24 +364,25 @@ class RubiksCubeAnimation(mn.ThreeDScene):
         self.add(self.cube)
         self.set_camera_orientation(phi=60 * mn.DEGREES, theta=-135 * mn.DEGREES)
 
-        label1 = mn.Text(f"Initial string: {self.initial_state}", font_size=24).to_corner(mn.UL)
+        label1 = mn.Text(f"Initial string: {self.initial_state}", font_size=24, color=mn.YELLOW).to_corner(mn.UL)
         self.add_fixed_in_frame_mobjects(label1)
         self.rotate(delay=6, rate=0.5)
         self.remove(label1)
 
         if self.moves_ph1:
-            self.animate_sequence(self.moves_ph1, self.moves_ph1_htm, "Applying phase 1 moves: ")
+            self.animate_sequence(self.moves_ph1, self.moves_ph1_htm, "Phase 1 moves: ")
 
         self.rotate(delay=6, rate=0.5)
         if self.moves_ph2:
-            self.animate_sequence(self.moves_ph2, self.moves_ph2_htm, "Applying phase 2 moves: ")
+            self.animate_sequence(self.moves_ph2, self.moves_ph2_htm, "Phase 2 moves: ")
 
         self.rotate(delay=6, rate=0.5)
 
 
     def animate_sequence(self, moves, moves_htm, prefix):
         current_text = ""
-        label = mn.Text(prefix, font_size=36).to_corner(mn.UL)
+        color = mn.BLUE_C if "Phase 1" in prefix else mn.PINK
+        label = mn.Text(prefix, font_size=36, color=color).to_corner(mn.UL)
         self.add_fixed_in_frame_mobjects(label)
         self.wait(1)
 
@@ -389,7 +390,7 @@ class RubiksCubeAnimation(mn.ThreeDScene):
             if i < len(moves_htm):
                 current_text += moves_htm[i] + " "
                 self.remove(label)
-                label = mn.Text(prefix + current_text, font_size=36).to_corner(mn.UL)
+                label = mn.Text(prefix + current_text, font_size=36, color=color).to_corner(mn.UL)
                 self.add_fixed_in_frame_mobjects(label)
 
             self.play(CubeMove(self.cube, move), run_time=0.5)

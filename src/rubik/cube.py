@@ -465,9 +465,10 @@ class Cube:
 
         return table
 
-    def plot_cube(self, plot_with_labels: bool = False):
+    def plot_cube(self, plot_with_labels: bool = False, console=None):
         """Plot the entire cube with all faces."""
-        console = Console()
+        if console is None:
+            console = Console()
 
         face_plotter = (
             self.plot_face_with_labels if plot_with_labels else self.plot_face

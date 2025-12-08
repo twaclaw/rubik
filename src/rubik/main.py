@@ -13,7 +13,17 @@ from .cube import Cube
 from .ids import INFO as ids_info
 from .ids import ids
 
-console = Console()
+console = None
+
+
+def get_console(args):
+    global console
+    if console is None:
+        if args.screenshot:
+            console = Console(record=True)
+        else:
+            console = Console()
+    return console
 
 
 def create_video(args, moves_fwd, moves_bcw, cube_string, format:str = "mp4"):
@@ -67,6 +77,7 @@ def create_video(args, moves_fwd, moves_bcw, cube_string, format:str = "mp4"):
 
 
 def run_solver(cube: Cube, args):
+    console = get_console(args)
     algorithm = args.algorithm
     solver_fn: callable | None = None
     if algorithm == "bfs":
@@ -110,11 +121,11 @@ def run_solver(cube: Cube, args):
     console.print(f"Solution: [bold cyan]{solution_str}[/bold cyan]")
     console.print(f"Elapsed time: [bold]{t:.2f} s[/bold].")
     console.rule("[bold] Original Cube")
-    cube0.plot_cube()
+    cube0.plot_cube(console=console)
     if solution is not None:
-        console.rule("[bold] Solved Cube")
+        console.rule(f"[bold] After applying [/bold] [bold cyan]{solution_str}[/bold cyan]")
         cube0.moves(solution)
-        cube0.plot_cube()
+        cube0.plot_cube(console=console)
         if args.size == 3:
             if algorithm.startswith("bi-") and args.video:
                 console.rule("[bold]Generating video")
@@ -165,6 +176,7 @@ def main():
 
     parser.add_argument("--video", action="store_true", help="Generate a video of the solution")
     parser.add_argument("--gif", action="store_true", help="Generate a GIF of the solution")
+    parser.add_argument("--screenshot", type=str, help="Save console output to SVG file")
 
     args = parser.parse_args()
 
@@ -173,6 +185,8 @@ def main():
         size=args.size,
         number_of_scramble_moves=args.number_of_scrambles,
     )
+
+    console = get_console(args)
 
     if args.size > 2:
         console.rule("[bold] Warnings")
@@ -185,3 +199,6 @@ def main():
         #     )
 
     run_solver(cube, args)
+
+    if args.screenshot:
+        console.save_svg(args.screenshot, title="Rubik's Cube Solver")

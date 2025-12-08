@@ -1099,10 +1099,10 @@ for j in range(k.N_SYM):
 
 
 class Symmetries:
-    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True):
+    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True, console: Console | None = None):
         self.folder = folder
         self.show_progress = show_progress
-        self.console = Console()  # use for pretty printing and progress bars
+        self.console = console if console is not None else Console()  # use for pretty printing and progress bars
 
         if not os.path.exists(self.folder):
             os.mkdir(self.folder)
@@ -1218,6 +1218,7 @@ class Symmetries:
                     description=f"Generating {fname}...".ljust(
                         k.PROGRESS_BAR_DESC_WIDTH
                     ),
+                    console=self.console,
                 )
 
             for t in iterator:
@@ -1271,6 +1272,7 @@ class Symmetries:
                     description="Generating flipslice sym-tables...".ljust(
                         k.PROGRESS_BAR_DESC_WIDTH
                     ),
+                    console=self.console,
                 )
 
             for slc in iterator:
@@ -1346,6 +1348,7 @@ class Symmetries:
                     description="Generating corner sym-tables...".ljust(
                         k.PROGRESS_BAR_DESC_WIDTH
                     ),
+                    console=self.console,
                 )
 
             for cp in iterator:

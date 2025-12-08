@@ -15,10 +15,10 @@ from .moves import Moves
 
 
 class Pruning:
-    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True):
+    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True, console: Console | None = None):
         self.folder = folder
         self.show_progress = show_progress
-        self.console = Console()
+        self.console = console if console is not None else Console()
 
         if not os.path.exists(self.folder):
             os.mkdir(self.folder)
@@ -29,8 +29,8 @@ class Pruning:
         self.distance = None
 
         # Dependencies
-        self.moves = Moves(folder=self.folder, show_progress=False)
-        self.symmetries = Symmetries(folder=self.folder, show_progress=False)
+        self.moves = Moves(folder=self.folder, show_progress=False, console=self.console)
+        self.symmetries = Symmetries(folder=self.folder, show_progress=False, console=self.console)
 
         # Load dependencies
         self.moves.create_tables()
@@ -116,6 +116,7 @@ class Pruning:
                     description="Symmetries of flipslice classes".ljust(
                         k.PROGRESS_BAR_DESC_WIDTH
                     ),
+                    console=self.console,
                 )
 
             for i in iterator:
@@ -189,6 +190,7 @@ class Pruning:
                         description=f"Depth {depth} done: {done}/{total} [{'Back' if backsearch else 'Fwd'}]".ljust(
                             k.PROGRESS_BAR_DESC_WIDTH
                         ),
+                        console=self.console,
                     )
 
                 for i in iterator:
@@ -308,6 +310,7 @@ class Pruning:
                     description="Symmetries of corner classes".ljust(
                         k.PROGRESS_BAR_DESC_WIDTH
                     ),
+                    console=self.console,
                 )
 
             for i in iterator:
@@ -344,6 +347,7 @@ class Pruning:
                     iterator = track(
                         iterator,
                         description=f"Depth {depth} done: {done}/{total}".ljust(k.PROGRESS_BAR_DESC_WIDTH),
+                        console=self.console,
                     )
 
                 for c_classidx in iterator:
@@ -465,6 +469,7 @@ class Pruning:
                     description=f"Generating {fname}...".ljust(
                         k.PROGRESS_BAR_DESC_WIDTH
                     ),
+                    console=self.console,
                 )
 
             for depth in iterator:

@@ -9,7 +9,17 @@ from .moves import Moves
 from .pruning import Pruning
 from .solver import Solver
 
-console = Console()
+console = None
+
+
+def get_console(args):
+    global console
+    if console is None:
+        if hasattr(args, 'screenshot') and args.screenshot:
+            console = Console(record=True)
+        else:
+            console = Console()
+    return console
 
 
 def create_video(args, moves_ph1, moves_ph2, moves_ph1_htm=None, moves_ph2_htm=None, format:str = "mp4"):
@@ -34,6 +44,12 @@ def create_video(args, moves_ph1, moves_ph2, moves_ph1_htm=None, moves_ph2_htm=N
         "verbosity": "CRITICAL",
         "progress_bar": "none",
     }
+
+    if args.high_quality:
+        manim_config["quality"] = "high_quality"
+        manim_config["frame_rate"] = 60
+        del(manim_config["pixel_height"])
+        del(manim_config["pixel_width"])
 
     if format == "gif":
         manim_config["format"] = "gif"
@@ -72,18 +88,19 @@ def create_video(args, moves_ph1, moves_ph2, moves_ph1_htm=None, moves_ph2_htm=N
 
 
 def create_tables(args):
+    console = get_console(args)
     start_time = time.time()
 
-    symmetries = Symmetries(folder=args.path, show_progress=args.verbose)
+    symmetries = Symmetries(folder=args.path, show_progress=args.verbose, console=console)
     symmetries.create_tables()
 
-    moves = Moves(folder=args.path, show_progress=args.verbose)
+    moves = Moves(folder=args.path, show_progress=args.verbose, console=console)
     moves.create_tables()
 
-    pruning = Pruning(folder=args.path, show_progress=args.verbose)
+    pruning = Pruning(folder=args.path, show_progress=args.verbose, console=console)
     pruning.create_tables()
 
-    coord = Coord(folder=args.path, show_progress=args.verbose)
+    coord = Coord(folder=args.path, show_progress=args.verbose, console=console)
     coord.create_tables()
 
     end_time = time.time()
@@ -95,7 +112,8 @@ def call_solver(args):
     from rubik.cube import Cube
     from rubik.kociemba.cubie import CubieCube
 
-    solver = Solver(folder=args.path, show_progress=args.verbose)
+    console = get_console(args)
+    solver = Solver(folder=args.path, show_progress=args.verbose, console=console)
     cc = CubieCube()
     if not args.cube_string:
         c = Cube(initial="random", number_of_scramble_moves=args.num_scrambles)
@@ -118,15 +136,15 @@ def call_solver(args):
     console.print(f"Solved in [bold]{r.execution_time * 1000:.2f} ms[/bold].")
 
     console.rule("[bold] Original Cube")
-    c.plot_cube(plot_with_labels=args.with_labels)
+    c.plot_cube(plot_with_labels=args.with_labels, console=console)
     c.moves(ph1_str)
     console.rule("[bold] After Phase 1")
     console.print(f"[bold cyan]Phase 1 moves: {ph1_str}[/bold cyan]")
-    c.plot_cube(plot_with_labels=args.with_labels)
+    c.plot_cube(plot_with_labels=args.with_labels, console=console)
     c.moves(ph2_str)
-    console.rule("[bold] Solved Cube")
+    console.rule("[bold] After Phase 2")
     console.print(f"[bold magenta]Phase 2 moves: {ph2_str}[/bold magenta]")
-    c.plot_cube(plot_with_labels=args.with_labels)
+    c.plot_cube(plot_with_labels=args.with_labels, console=console)
 
     if args.video:
         console.rule("[bold] Generating Video")
@@ -147,6 +165,9 @@ def call_solver(args):
 def main():
     parser = argparse.ArgumentParser(description="Kociemba Algorithm")
     parser.add_argument("--verbose", action="store_true", help="Show progress")
+    parser.add_argument(
+        "--screenshot", type=str, help="Save console output to SVG file"
+    )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -187,13 +208,20 @@ def main():
     solver_parser.add_argument(
         "--gif", action="store_true", help="Generate a GIF of the solution"
     )
+    solver_parser.add_argument(
+        "--high-quality", action="store_true", help="Generate high quality video/GIF/image"
+    )
 
     args = parser.parse_args()
 
     if args.command == "create-tables":
-        create_tables(args.path, args.verbose)
+        create_tables(args)
     elif args.command == "solve":
         call_solver(args)
+
+    if args.screenshot:
+        console = get_console(args)
+        console.save_svg(args.screenshot, title="Kociemba Solver")
 
 
 if __name__ == "__main__":

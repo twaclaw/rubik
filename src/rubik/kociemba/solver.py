@@ -22,18 +22,18 @@ class SolverResult:
 
 
 class Solver:
-    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True):
+    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True, console: Console | None = None):
         self.folder = folder
         self.show_progress = show_progress
-        self.console = Console()
+        self.console = console if console is not None else Console()
         self.solution_ph1: str | None = None
         self.solution_ph2: str | None = None
 
         # Initialize tables
-        self.symmetries = Symmetries(folder=folder, show_progress=show_progress)
-        self.moves = Moves(folder=folder, show_progress=show_progress)
-        self.pruning = Pruning(folder=folder, show_progress=show_progress)
-        self.coord = Coord(folder=folder, show_progress=show_progress)
+        self.symmetries = Symmetries(folder=folder, show_progress=show_progress, console=self.console)
+        self.moves = Moves(folder=folder, show_progress=show_progress, console=self.console)
+        self.pruning = Pruning(folder=folder, show_progress=show_progress, console=self.console)
+        self.coord = Coord(folder=folder, show_progress=show_progress, console=self.console)
 
         # Load tables
         self.symmetries.create_tables()

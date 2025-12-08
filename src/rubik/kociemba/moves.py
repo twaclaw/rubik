@@ -12,10 +12,10 @@ from .defs import Constants as k
 
 
 class Moves:
-    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True):
+    def __init__(self, folder: str = k.FOLDER, show_progress: bool = True, console: Console | None = None):
         self.folder = folder
         self.show_progress = show_progress
-        self.console = Console()
+        self.console = console if console is not None else Console()
 
         if not os.path.exists(self.folder):
             os.mkdir(self.folder)
@@ -58,6 +58,7 @@ class Moves:
                     description=f"Generating {fname}...".ljust(
                         k.PROGRESS_BAR_DESC_WIDTH
                     ),
+                    console=self.console,
                 )
 
             for i in iterator:
@@ -96,6 +97,7 @@ class Moves:
                     description=f"Generating {fname}...".ljust(
                         k.PROGRESS_BAR_DESC_WIDTH
                     ),
+                    console=self.console,
                 )
 
             for i in iterator:
@@ -252,6 +254,7 @@ class Moves:
                     description=f"Generating {fname}...".ljust(
                         k.PROGRESS_BAR_DESC_WIDTH
                     ),
+                    console=self.console,
                 )
 
             for i in iterator:
@@ -292,6 +295,7 @@ class Moves:
                     description=f"Generating {fname}...".ljust(
                         k.PROGRESS_BAR_DESC_WIDTH
                     ),
+                    console=self.console,
                 )
 
             for i in iterator:
