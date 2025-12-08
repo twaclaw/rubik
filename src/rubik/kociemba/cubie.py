@@ -168,12 +168,12 @@ class CubieCube:
         )
 
         if corners is None:
-            self.corners = np.array([[Corner(i), 0] for i in range(8)], dtype=int)
+            self.corners = np.array([[Corner(i), 0] for i in range(self.num_corners)], dtype=int)
         else:
             self.corners = corners.copy()
 
         if edges is None:
-            self.edges = np.array([[Edge(i), 0] for i in range(12)], dtype=int)
+            self.edges = np.array([[Edge(i), 0] for i in range(self.num_edges)], dtype=int)
         else:
             self.edges = edges
 

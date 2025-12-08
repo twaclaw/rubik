@@ -54,6 +54,14 @@ def create_video(args, moves_fwd, moves_bcw, cube_string, format:str = "mp4"):
     if format == "gif":
         manim_config["format"] = "gif"
 
+    if args.high_quality:
+        manim_config["quality"] = "high_quality"
+        manim_config["frame_rate"] = 60
+        del(manim_config["pixel_height"])
+        del(manim_config["pixel_width"])
+
+
+
     @contextmanager
     def suppress_stdout_stderr():
         with open(os.devnull, "w") as devnull:
@@ -177,6 +185,11 @@ def main():
     parser.add_argument("--video", action="store_true", help="Generate a video of the solution")
     parser.add_argument("--gif", action="store_true", help="Generate a GIF of the solution")
     parser.add_argument("--screenshot", type=str, help="Save console output to SVG file")
+    parser.add_argument(
+        "--high-quality", action="store_true", help="Generate high quality video/GIF/image"
+    )
+
+
 
     args = parser.parse_args()
 
